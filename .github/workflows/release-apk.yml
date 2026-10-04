@@ -25,13 +25,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x gradlew || true
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prepare Keystore and Environment
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          else
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          touch .env
+          chmod +x gradlew || true
+          echo "Keystore and environment prepared successfully."
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Rename APK
+      - name: Prepare Release Artifacts
         run: |
           mkdir -p release-output
           cp app/build/outputs/apk/debug/app-debug.apk release-output/tetmester-pro-latest.apk
@@ -44,17 +55,19 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
           files: release-output/tetmester-pro-latest.apk
-          tag_name: ${{ github.ref_name || 'latest' }}
-          name: TétMester Pro ${{ github.ref_name || 'Latest' }}
+          tag_name: latest
+          name: TétMester Pro (Legfrissebb Kiadás)
           body: |
-            ### TétMester Pro - Frissítés
-            - 100 Napos Kamatos Kamat Tétkezelő
-            - Automatikus tőkearányos tétlépcső (Tőke / 49.25)
-            - 4-körös és Kármentés tétkalkuláció
-            - Élő mérkőzéskövető és AI meccselemző
-            - Alkalmazáson belüli egykattintásos frissítő
+            ###  TétMester Pro - Frissítés
+            - **100 Napos Kamatos Kamat Tétkezelő**
+            - **Automatikus tőkearányos tétnövekedés (Tőke / 49.25)**
+            - **Többkörös & Kármentés Tétkalkulátor**
+            - **Élő Mérkőzéskövető és AI meccselemző**
+            - **Alkalmazáson belüli frissítő motor**
+
+            *Telepítéshez töltsd le a lenti `tetmester-pro-latest.apk` fájlt.*
           draft: false
           prerelease: false

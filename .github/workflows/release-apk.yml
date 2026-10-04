@@ -25,16 +25,15 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Prepare Keystore and Environment
+      - name: Verify Permanent Keystore and Environment
         run: |
-          if [ -f debug.keystore.base64 ]; then
+          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
-          else
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
+          test -f debug.keystore || { echo "HIBA: Állandó debug.keystore nem található!"; exit 1; }
           touch .env
           chmod +x gradlew
-          echo "Debug keystore and environment successfully prepared."
+          echo "Állandó hitelesítő kulcs (Permanent Keystore) ellenőrizve és készen áll."
 
       - name: Build Debug APK with Gradle
         env:
@@ -61,11 +60,12 @@ jobs:
           name: TétMester Pro (Legfrissebb Kiadás)
           body: |
             ###  TétMester Pro - Frissítés
+            - **Állandó aláírókulcs (Permanent Keystore) használata** - nincs aláírás-ütközés a jövőbeli frissítéseknél!
             - **100 Napos Kamatos Kamat Tétkezelő**
             - **Automatikus tőkearányos tétnövekedés (Tőke / 49.25)**
             - **Többkörös & Kármentés Tétkalkulátor**
             - **Élő Mérkőzéskövető és AI meccselemző**
-            - **Alkalmazáson belüli frissítő motor**
+            - **Alkalmazáson belüli egykattintásos frissítő**
 
             *Telepítéshez töltsd le a lenti `tetmester-pro-latest.apk` fájlt.*
           draft: false

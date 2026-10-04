@@ -1,0 +1,6 @@
+{
+  "name": "TétMester Pro",
+  "description": "100 napos kamatos kamat tétkezelő stratégia kalkulátorral, többkörös profit- és kármentés-tervezővel, élő mérkőzéskövetővel, AI sportelemzővel és alkalmazáson belüli frissítővel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

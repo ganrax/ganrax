@@ -25,9 +25,6 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Prepare Keystore and Environment
         run: |
           if [ -f debug.keystore.base64 ]; then
@@ -36,10 +33,12 @@ jobs:
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
           touch .env
-          chmod +x gradlew || true
-          echo "Keystore and environment prepared successfully."
+          chmod +x gradlew
+          echo "Debug keystore and environment successfully prepared."
 
-      - name: Build Debug APK
+      - name: Build Debug APK with Gradle
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Prepare Release Artifacts

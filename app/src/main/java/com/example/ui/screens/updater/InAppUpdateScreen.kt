@@ -311,21 +311,76 @@ fun InAppUpdateScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = "Legújabb Változások és Újdonságok",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.History, contentDescription = null, tint = EmeraldPrimary)
+                            Text(
+                                text = "Verziókövető & Kiadási Napló (Changelog)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                        Text(
-                            text = lastUpdateInfo?.releaseNotes ?: "Rendszeroptimalizációk és hibajavítások.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 20.sp
-                        )
+
+                        // v1.2.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = EmeraldPrimary.copy(alpha = 0.08f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("v1.2.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = EmeraldPrimary,
+                                        modifier = Modifier.padding(2.dp)
+                                    ) {
+                                        Text("AKTÍV", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
+                                Text("• Automatikus tőkearányos tétnövekedés (Tőke / 49.25 az Excel tábla szerint)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Zárolt meccs tétkalkuláció: nincs szükség kézi tétbeírásra, a rendszer odds és kör alapján számol", style = MaterialTheme.typography.bodySmall)
+                                Text("• Közvetlen GitHub Releases APK önfrissítő motor (dzsolt5/ganrax)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Beépített Verziókövető és APK sértetlenség-ellenőrző rendszer", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.1.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.1.0 (Előző kiadás)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
+                                Text("• 100 Napos Kamatos Kamat Terv és napi interaktív napváltó", style = MaterialTheme.typography.bodySmall)
+                                Text("• Élő mérkőzéskövető, eredményrögzítő és automatikus bankroll jóváírás", style = MaterialTheme.typography.bodySmall)
+                                Text("• Gemini AI meccselemző és fogadási stratéga asszisztens", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.0.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.0.0 (Kezdeti kiadás)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
+                                Text("• 4-Körös Martingale és Kármentés tétkalkulátor Excel minták alapján", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
             }

@@ -17,11 +17,15 @@ class UpdateViewModel(private val updaterService: InAppUpdaterService) : ViewMod
 
     val updateState: StateFlow<UpdateDownloadState> = updaterService.updateState
 
-    private val _customUrlInput = MutableStateFlow("")
+    private val _customUrlInput = MutableStateFlow("dzsolt5/ganrax")
     val customUrlInput: StateFlow<String> = _customUrlInput.asStateFlow()
 
     private val _lastUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val lastUpdateInfo: StateFlow<AppUpdateInfo?> = _lastUpdateInfo.asStateFlow()
+
+    init {
+        checkForUpdates()
+    }
 
     fun setCustomUrl(url: String) {
         _customUrlInput.value = url

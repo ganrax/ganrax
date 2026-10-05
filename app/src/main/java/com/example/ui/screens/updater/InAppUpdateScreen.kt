@@ -299,7 +299,7 @@ fun InAppUpdateScreen(
                                             }
                                             TextButton(onClick = {
                                                 try {
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ganrax/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
                                                     context.startActivity(intent)
                                                 } catch (e: Exception) {
                                                     Toast.makeText(context, "Nem sikerült megnyitni a böngészőt", Toast.LENGTH_SHORT).show()
@@ -322,7 +322,7 @@ fun InAppUpdateScreen(
                             OutlinedButton(
                                 onClick = {
                                     try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ganrax/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "Hiba: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -502,7 +502,7 @@ fun InAppUpdateScreen(
                         }
 
                         Text(
-                            text = "Írd be a GitHub repository-d nevét (pl. dzsolt5/tetmester-pro) vagy a közvetlen Release APK linket az automatikus GitHub frissítéshez:",
+                            text = "Írd be a GitHub repository-d nevét (pl. ganrax/ganrax) vagy a közvetlen Release APK linket az automatikus GitHub frissítéshez:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

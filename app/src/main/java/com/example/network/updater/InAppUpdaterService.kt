@@ -53,7 +53,7 @@ class InAppUpdaterService(private val context: Context) {
         val currentCode = getCurrentVersionCode()
         val currentName = getCurrentVersionName()
 
-        val repoPath = if (customUrl.isNotBlank()) customUrl.trim().removePrefix("https://github.com/").removePrefix("http://github.com/") else "dzsolt5/ganrax"
+        val repoPath = if (customUrl.isNotBlank()) customUrl.trim().removePrefix("https://github.com/").removePrefix("http://github.com/") else "ganrax/ganrax"
         val directFallbackApkUrl = "https://github.com/$repoPath/releases/latest/download/tetmester-pro-latest.apk"
 
         try {
@@ -130,8 +130,8 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.3.0 Pro",
-                releaseNotes = "GitHub Releases frissítés (dzsolt5/ganrax).",
+                latestVersionName = "v1.4.0 Pro",
+                releaseNotes = "GitHub Releases frissítés (ganrax/ganrax).",
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true
             )
@@ -155,7 +155,7 @@ class InAppUpdaterService(private val context: Context) {
             val actualUrl = if (downloadUrl.isNotBlank() && downloadUrl.startsWith("http")) {
                 downloadUrl
             } else {
-                "https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"
+                "https://github.com/ganrax/ganrax/releases/latest/download/tetmester-pro-latest.apk"
             }
 
             val request = Request.Builder()
@@ -167,7 +167,7 @@ class InAppUpdaterService(private val context: Context) {
             val body = response.body
 
             if (!response.isSuccessful || body == null) {
-                _updateState.value = UpdateDownloadState.Error("Nem sikerült letölteni az APK-t (HTTP ${response.code}). Ellenőrizd, hogy a GitHub Release elkészült-e a dzsolt5/ganrax oldalon!")
+                _updateState.value = UpdateDownloadState.Error("Nem sikerült letölteni az APK-t (HTTP ${response.code}). Ellenőrizd, hogy a GitHub Release elkészült-e a ganrax/ganrax oldalon!")
                 return@withContext
             }
 

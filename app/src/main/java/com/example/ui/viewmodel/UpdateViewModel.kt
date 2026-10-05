@@ -17,7 +17,7 @@ class UpdateViewModel(private val updaterService: InAppUpdaterService) : ViewMod
 
     val updateState: StateFlow<UpdateDownloadState> = updaterService.updateState
 
-    private val _customUrlInput = MutableStateFlow("dzsolt5/ganrax")
+    private val _customUrlInput = MutableStateFlow("ganrax/ganrax")
     val customUrlInput: StateFlow<String> = _customUrlInput.asStateFlow()
 
     private val _lastUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)

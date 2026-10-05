@@ -96,3 +96,22 @@ data class ParsedTelegramAlert(
     val overUnderOdds: String = "",
     val rawText: String = ""
 )
+
+data class CalculatorMatchItem(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val homeTeam: String = "",
+    val awayTeam: String = "",
+    val matchName: String = "",
+    val league: String = "",
+    val strategyName: String = "",
+    val timer: String = "",
+    val score: String = "",
+    val googleSearchUrl: String = "",
+    val flashscoreSearchUrl: String = "",
+    val oddsInput: String = "1.50",
+    val selectedRound: Int = 1,
+    val calculatedStake: Double = 0.0,
+    val potentialReturn: Double = 0.0,
+    val netProfit: Double = 0.0,
+    val isSavedToTracker: Boolean = false
+)

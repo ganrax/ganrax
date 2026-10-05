@@ -109,19 +109,18 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.3.0 Pro",
+                latestVersionName = "v1.4.0 Pro",
                 releaseNotes = """
-                    • Telegram Értesítés Feldolgozó (Mérkőzések, stratégiák és Google kereső linkek kinyerése)
-                    • 100 Napos Kamatos Kamat Tétkezelő (Valós idejű bankroll szimuláció)
-                    • Automatikus tőkearányos tétnövekedés (Tőke / 49.25)
-                    • 4-Körös és Kármentés Tétkalkulátor közvetlen meccs-hozzárendeléssel
-                    • Élő mérkőzéskövető, eredményrögzítő és statisztikai ROI számítás
-                    • Állandó aláírókulcs és közvetlen GitHub Releases APK önfrissítés
+                    • Egyetlen Letisztult Oldalon: Kalkulátor és Telegram Meccsek közvetlen kézi odds alapú számítással
+                    • Felesleges fülek törölve: csak a Stratégia, Kalkulátor, Meccsek és Frissítő maradt
+                    • Kézzel megadható oddsok és valós idejű tőkearányos tét/profit számítás
+                    • Közvetlen Google Keresés és 1-kattintásos rögzítés a Meccsekhez
+                    • Android 14 (API 34) natív optimalizáció és megbízható csomagtelepítés
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,
                 fileSizeMb = 24.0,
-                releaseDate = "2026-10-04"
+                releaseDate = "2026-10-05"
             )
 
             _updateState.value = UpdateDownloadState.Available(defaultInfo)

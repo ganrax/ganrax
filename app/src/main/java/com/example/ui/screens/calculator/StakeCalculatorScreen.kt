@@ -1,5 +1,7 @@
 package com.example.ui.screens.calculator
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -12,7 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -28,10 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.domain.calculator.BettingMathEngine
+import com.example.domain.model.CalculatorMatchItem
 import com.example.domain.model.CalculatorMode
 import com.example.domain.model.PresetOddsRow
 import com.example.domain.model.RoundStakeResult
-import com.example.ui.components.*
+import com.example.ui.components.AppHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.CalculatorViewModel
 
@@ -42,6 +49,9 @@ fun StakeCalculatorScreen(
     onMatchCreated: () -> Unit
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val clipboardManager = LocalClipboardManager.current
+
     val mode by viewModel.mode.collectAsStateWithLifecycle()
     val bankrollStr by viewModel.bankrollInput.collectAsStateWithLifecycle()
     val baseStakeStr by viewModel.baseStakeInput.collectAsStateWithLifecycle()
@@ -50,14 +60,17 @@ fun StakeCalculatorScreen(
     val progressionResults by viewModel.progressionResults.collectAsStateWithLifecycle()
     val presetTable by viewModel.presetOddsTable.collectAsStateWithLifecycle()
 
+    val telegramInput by viewModel.telegramInput.collectAsStateWithLifecycle()
+    val parsedMatches by viewModel.parsedMatches.collectAsStateWithLifecycle()
+
     var showPresetDialog by remember { mutableStateOf(false) }
-    var saveMatchRound by remember { mutableStateOf<RoundStakeResult?>(null) }
+    var showLadderDetails by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             AppHeader(
                 title = "Tétkalkulátor",
-                subtitle = mode.subtitle,
+                subtitle = "Telegram meccsek & kézi odds alapú tétkezelés",
                 currentBank = bankrollStr.toDoubleOrNull()
             )
         },
@@ -102,7 +115,7 @@ fun StakeCalculatorScreen(
 
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (mode == CalculatorMode.BREAK_EVEN) GoldOdds else Color.Transparent,
+                            color = if (mode == CalculatorMode.BREAK_EVEN) EmeraldPrimary else Color.Transparent,
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { viewModel.setMode(CalculatorMode.BREAK_EVEN) }
@@ -121,10 +134,253 @@ fun StakeCalculatorScreen(
                 }
             }
 
-            // Inputs Row (Bankroll & Auto-Calculated Base Stake)
+            // Bankroll & Base Stake Summary Card
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Aktuális Tőke (Bankroll):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = BettingMathEngine.formatCurrency(bankrollStr.toDoubleOrNull() ?: 10000.0),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = EmeraldPrimary
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "Alaptét (Tőke / 49.25):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = BettingMathEngine.formatCurrency(baseStakeStr.toDoubleOrNull() ?: 203.0),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = GoldOdds
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "✓ A tétösszegek a tőke növekedésével automatikusan nőnek az Excel tábla szerint.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EmeraldPrimary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Telegram Alert Input Card (Unified on the same page!)
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(EmeraldPrimary.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = null,
+                                        tint = EmeraldPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Telegram Értesítés Beillesztése",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            if (parsedMatches.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = EmeraldPrimary
+                                ) {
+                                    Text(
+                                        text = "${parsedMatches.size} meccs",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = telegramInput,
+                            onValueChange = { viewModel.setTelegramInput(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 90.dp, max = 180.dp),
+                            placeholder = {
+                                Text(
+                                    text = "Ide illeszd be a ganrax Alerts vagy más Telegram értesítést...\nPl. ⚡Second Half Action Ready\nBnei Yehud vs Maccabi Amishav Petah Tikva...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldPrimary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            )
+                        )
+
+                        // Action Buttons: Paste, Sample, Calculate
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val clip = clipboardManager.getText()?.text
+                                    if (!clip.isNullOrBlank()) {
+                                        viewModel.setTelegramInput(clip)
+                                        viewModel.parseTelegramText()
+                                        Toast.makeText(context, "Beillesztve és feldolgozva!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "A vágólap üres!", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Beillesztés", fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.loadSampleTelegram(autoParse = true)
+                                    Toast.makeText(context, "Minta értesítések betöltve!", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Minta", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.parseTelegramText()
+                                    Toast.makeText(context, "Mérkőzések frissítve!", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                modifier = Modifier.weight(1.3f),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Calculate, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Kinyerés & Tét", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+
+                            if (telegramInput.isNotBlank()) {
+                                IconButton(
+                                    onClick = { viewModel.clearTelegram() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Clear, contentDescription = "Törlés", tint = StatusLost)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section Header: Match-Based Calculations
+            if (parsedMatches.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Telegram Meccsek Tétkalkulációja (${parsedMatches.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                itemsIndexed(parsedMatches, key = { _, match -> match.id }) { index, match ->
+                    MatchCalculatorCard(
+                        index = index + 1,
+                        match = match,
+                        onOddsChange = { newOdds -> viewModel.updateMatchOdds(match.id, newOdds) },
+                        onRoundChange = { newRound -> viewModel.updateMatchRound(match.id, newRound) },
+                        onOpenGoogle = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(match.googleSearchUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                uriHandler.openUri(match.googleSearchUrl)
+                            }
+                        },
+                        onSaveToTracker = {
+                            viewModel.saveParsedMatchToTracker(match.id) {
+                                Toast.makeText(context, "${match.matchName} rögzítve a Meccsekhez!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Collapsible Standard 4-Round Ladder & Excel Table
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
@@ -135,209 +391,120 @@ fun StakeCalculatorScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "Aktuális Tőke (Bankroll):",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        val bankVal = bankrollStr.toDoubleOrNull() ?: 10000.0
-                                        Text(
-                                            text = BettingMathEngine.formatCurrency(bankVal),
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "Alaptét (Tőke / 49.25):",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        val baseVal = baseStakeStr.toDoubleOrNull() ?: 200.0
-                                        Text(
-                                            text = BettingMathEngine.formatCurrency(baseVal),
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = CyanAccent
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "✓ A tétösszegek a tőke növekedésével automatikusan növekednek az Excel képletek szerint.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = EmeraldPrimary,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        // Quick Preset Odds Bar
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showLadderDetails = !showLadderDetails },
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TableChart,
+                                    contentDescription = null,
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Általános 4-Körös Tétlépcső & Sablonok",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Icon(
+                                imageVector = if (showLadderDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (showLadderDetails) {
                             Text(
                                 text = "Gyors Odds Sablonok:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            TextButton(
-                                onClick = { showPresetDialog = true },
-                                modifier = Modifier.testTag("open_preset_table_button")
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(imageVector = Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Teljes Excel Tábla", fontSize = 12.sp)
-                            }
-                        }
-
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val quickPresets = listOf(1.33, 1.40, 1.50, 1.60, 1.72, 1.80, 1.90, 2.00)
-                            items(quickPresets) { odd ->
-                                SuggestionChip(
-                                    onClick = { viewModel.applyPresetOdd(odd) },
-                                    label = { Text("$odd", fontWeight = FontWeight.Bold) },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                val quickOdds = listOf(1.33, 1.40, 1.50, 1.60, 1.72, 1.85, 2.00)
+                                items(quickOdds) { odds ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { viewModel.applyPresetOdd(odds) },
+                                        label = { Text(text = String.format(java.util.Locale.US, "%.2f", odds), fontWeight = FontWeight.Bold) },
+                                        shape = RoundedCornerShape(10.dp)
                                     )
-                                )
+                                }
+                            }
+
+                            // 4 Rounds Ladder display
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                progressionResults.forEachIndexed { i, result ->
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${result.round}. Kör (Odds: ${roundOdds.getOrNull(i) ?: "1.50"}):",
+                                                fontWeight = FontWeight.SemiBold,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            Text(
+                                                text = BettingMathEngine.formatCurrency(result.stake),
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = EmeraldPrimary,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-
-            // Round Controls Header (+ / - Rounds)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Többkörös Tétlépcső (${progressionResults.size} Kör)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(
-                            onClick = { viewModel.removeRound() },
-                            enabled = roundOdds.size > 2,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = "Kör törlése")
-                        }
-                        IconButton(
-                            onClick = { viewModel.addRound() },
-                            enabled = roundOdds.size < 6,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = "Kör hozzáadása")
-                        }
-                    }
-                }
-            }
-
-            // Progression Cards for Each Round
-            itemsIndexed(progressionResults) { index, result ->
-                RoundCard(
-                    result = result,
-                    currentOddStr = roundOdds.getOrElse(index) { "1.50" },
-                    onOddChange = { viewModel.updateOdd(index, it) },
-                    onSaveMatch = { saveMatchRound = result }
-                )
             }
         }
-    }
-
-    // Save To Match Tracker Dialog
-    saveMatchRound?.let { round ->
-        SaveRoundToMatchDialog(
-            round = round,
-            onDismiss = { saveMatchRound = null },
-            onSave = { home, away, sport, league, tip ->
-                viewModel.saveStakeAsMatch(
-                    round = round.round,
-                    odds = round.odds,
-                    stake = round.stake,
-                    homeTeam = home,
-                    awayTeam = away,
-                    sport = sport,
-                    league = league,
-                    tip = tip,
-                    onSaved = {
-                        saveMatchRound = null
-                        Toast.makeText(context, "Mérkőzés elmentve a követőbe!", Toast.LENGTH_SHORT).show()
-                        onMatchCreated()
-                    }
-                )
-            }
-        )
-    }
-
-    // Preset Excel Reference Dialog
-    if (showPresetDialog) {
-        PresetOddsTableDialog(
-            presetTable = presetTable,
-            baseStake = baseStakeStr.toDoubleOrNull() ?: 200.0,
-            mode = mode,
-            onSelectOdd = { odd ->
-                viewModel.applyPresetOdd(odd)
-                showPresetDialog = false
-            },
-            onDismiss = { showPresetDialog = false }
-        )
     }
 }
 
 @Composable
-fun RoundCard(
-    result: RoundStakeResult,
-    currentOddStr: String,
-    onOddChange: (String) -> Unit,
-    onSaveMatch: () -> Unit
+fun MatchCalculatorCard(
+    index: Int,
+    match: CalculatorMatchItem,
+    onOddsChange: (String) -> Unit,
+    onRoundChange: (Int) -> Unit,
+    onOpenGoogle: () -> Unit,
+    onSaveToTracker: () -> Unit
 ) {
-    val roundColor = when (result.round) {
-        1 -> EmeraldPrimary
-        2 -> CyanAccent
-        3 -> GoldOdds
-        else -> StatusLost
-    }
-
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, roundColor.copy(alpha = 0.4f)),
-        modifier = Modifier.fillMaxWidth().testTag("round_card_${result.round}")
+        border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Header: #Index + Strategy badge + Timer/Score
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -345,56 +512,171 @@ fun RoundCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(roundColor.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = EmeraldPrimary.copy(alpha = 0.2f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.5f))
                     ) {
                         Text(
-                            text = "${result.round}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = roundColor
+                            text = "#$index",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldPrimary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
-                    Column {
-                        Text(
-                            text = "${result.round}. Kör Tétje",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Szükséges tét a célhoz",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (match.strategyName.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = GoldOdds.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = match.strategyName,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldOdds,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
-                // Odds Input
-                OutlinedTextField(
-                    value = currentOddStr,
-                    onValueChange = onOddChange,
-                    label = { Text("Odds") },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.width(90.dp).testTag("odds_input_round_${result.round}"),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = GoldOdds)
+                if (match.score.isNotBlank() || match.timer.isNotBlank()) {
+                    Text(
+                        text = "${match.score} (${match.timer})",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = EmeraldPrimary
+                    )
+                }
+            }
+
+            // League
+            if (match.league.isNotBlank()) {
+                Text(
+                    text = match.league,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            // Teams (Big prominent title)
+            Text(
+                text = match.matchName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-            // Main Stake Display
+            // Round Selector Row (1. Kör, 2. Kör, 3. Kör, 4. Kör)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Válassz Kört:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    for (r in 1..4) {
+                        val isSelected = match.selectedRound == r
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onRoundChange(r) }
+                        ) {
+                            Text(
+                                text = "$r. Kör",
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 12.sp,
+                                color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Odds Input & Quick Buttons
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Kézzel megadott Odds:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    OutlinedTextField(
+                        value = match.oddsInput,
+                        onValueChange = onOddsChange,
+                        modifier = Modifier.width(110.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        textStyle = LocalTextStyle.current.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = GoldOdds,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldOdds,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                // Quick Odds Chips
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val quick = listOf("1.33", "1.40", "1.50", "1.60", "1.72", "1.85", "2.00")
+                    items(quick) { qOdds ->
+                        val isSelected = match.oddsInput == qOdds
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSelected) GoldOdds else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.clickable { onOddsChange(qOdds) }
+                        ) {
+                            Text(
+                                text = qOdds,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Calculation Results Highlight Box
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                color = EmeraldPrimary.copy(alpha = 0.12f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.4f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -406,261 +688,80 @@ fun RoundCard(
                 ) {
                     Column {
                         Text(
-                            text = "Kiszámított Tét:",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "${match.selectedRound}. Kör Kiszámított Tétje:",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = BettingMathEngine.formatCurrency(result.stake),
+                            text = BettingMathEngine.formatCurrency(match.calculatedStake),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
-                            color = roundColor
+                            color = EmeraldPrimary
                         )
                     }
 
-                    RiskGaugeBadge(percentageOfBank = result.bankPercentage)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Várható Kifizetés:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = BettingMathEngine.formatCurrency(match.potentialReturn),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = GoldOdds
+                        )
+                        Text(
+                            text = "Tiszta Profit: +${BettingMathEngine.formatCurrency(match.netProfit)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StatusWon
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Breakdown Grid
+            // Action Buttons: Google Search & Save to Matches
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Összes Kockázat",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = BettingMathEngine.formatCurrency(result.totalInvested),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                OutlinedButton(
+                    onClick = onOpenGoogle,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Google Keresés", fontSize = 12.sp)
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Várható Kifizetés",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Button(
+                    onClick = onSaveToTracker,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (match.isSavedToTracker) StatusWon else EmeraldPrimary,
+                        contentColor = Color.Black
+                    ),
+                    modifier = Modifier.weight(1.3f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (match.isSavedToTracker) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = BettingMathEngine.formatCurrency(result.potentialReturn),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CyanAccent
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Tiszta Nyereség",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "+${BettingMathEngine.formatCurrency(result.netProfit)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldPrimary
+                        text = if (match.isSavedToTracker) "Rögzítve ✓" else "Rögzítés a Meccsekhez",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Save to match button
-            Button(
-                onClick = onSaveMatch,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().testTag("save_round_${result.round}_button")
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Fogadás Rögzítése Ezzel a Téttel (${BettingMathEngine.formatCurrency(result.stake)})", fontSize = 12.sp)
             }
         }
     }
-}
-
-@Composable
-fun SaveRoundToMatchDialog(
-    round: RoundStakeResult,
-    onDismiss: () -> Unit,
-    onSave: (home: String, away: String, sport: String, league: String, tip: String) -> Unit
-) {
-    var homeTeam by remember { mutableStateOf("") }
-    var awayTeam by remember { mutableStateOf("") }
-    var sport by remember { mutableStateOf("Labdarúgás") }
-    var league by remember { mutableStateOf("Bajnokság") }
-    var tip by remember { mutableStateOf("Hazai győzelem (1)") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("${round.round}. Körös Fogadás Mentése") },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Tét: ${BettingMathEngine.formatCurrency(round.stake)}", fontWeight = FontWeight.Bold)
-                        Text("Odds: ${round.odds}", color = GoldOdds, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                OutlinedTextField(
-                    value = homeTeam,
-                    onValueChange = { homeTeam = it },
-                    label = { Text("Hazai Csapat") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("match_home_input")
-                )
-
-                OutlinedTextField(
-                    value = awayTeam,
-                    onValueChange = { awayTeam = it },
-                    label = { Text("Vendég Csapat") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("match_away_input")
-                )
-
-                OutlinedTextField(
-                    value = tip,
-                    onValueChange = { tip = it },
-                    label = { Text("Tipp / Fogadási Piac") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = league,
-                    onValueChange = { league = it },
-                    label = { Text("Bajnokság / Liga") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (homeTeam.isNotBlank() && awayTeam.isNotBlank()) {
-                        onSave(homeTeam, awayTeam, sport, league, tip)
-                    }
-                },
-                enabled = homeTeam.isNotBlank() && awayTeam.isNotBlank()
-            ) {
-                Text("Mentés a Követőbe")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Mégse")
-            }
-        }
-    )
-}
-
-@Composable
-fun PresetOddsTableDialog(
-    presetTable: List<PresetOddsRow>,
-    baseStake: Double,
-    mode: CalculatorMode,
-    onSelectOdd: (Double) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column {
-                Text("Excel Tétkezelő Referenciatábla", fontWeight = FontWeight.Bold)
-                Text(
-                    text = "Mód: ${mode.title} (Alaptét: ${baseStake.toInt()} Ft)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        text = {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(350.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Odds", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("2. Kör", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("3. Kör", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("4. Kör", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    }
-                }
-
-                items(presetTable) { row ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelectOdd(row.odds) }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${row.odds}",
-                            color = GoldOdds,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "${row.round2Stake.toInt()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "${row.round3Stake.toInt()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "${row.round4Stake.toInt()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Bezárás")
-            }
-        }
-    )
 }

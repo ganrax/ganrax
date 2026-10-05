@@ -108,14 +108,15 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.2.0 Pro",
+                latestVersionName = "v1.3.0 Pro",
                 releaseNotes = """
-                    • 100 Napos Kamatos Kamat Tétkezelő 2.0 (Valós idejű bankroll szimuláció)
+                    • Telegram Értesítés Feldolgozó & Match Linker (Mérkőzések, stratégiák és Google kereső linkek kinyerése)
+                    • 100 Napos Kamatos Kamat Tétkezelő (Valós idejű bankroll szimuláció)
                     • Automatikus tőkearányos tétnövekedés (Tőke / 49.25)
                     • 4-Körös és Kármentés Tétkalkulátor közvetlen meccs-hozzárendeléssel
                     • Élő mérkőzéskövető, eredményrögzítő és statisztikai ROI számítás
                     • Gemini AI meccselemző és fogadási stratéga asszisztens
-                    • Közvetlen GitHub Releases APK frissítés
+                    • Közvetlen GitHub Releases APK önfrissítés
                 """.trimIndent(),
                 downloadUrl = "",
                 isUpdateAvailable = true,

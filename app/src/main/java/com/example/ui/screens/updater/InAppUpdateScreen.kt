@@ -327,7 +327,7 @@ fun InAppUpdateScreen(
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // v1.2.0
+                        // v1.3.0
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = EmeraldPrimary.copy(alpha = 0.08f),
@@ -340,7 +340,7 @@ fun InAppUpdateScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("v1.2.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
+                                    Text("v1.3.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = EmeraldPrimary,
@@ -349,10 +349,23 @@ fun InAppUpdateScreen(
                                         Text("AKTÍV", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
+                                Text("• Telegram Értesítés Feldolgozó (ganrax Alerts üzenetekből meccsek, csapatok és stratégiák kinyerése)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Automatikus kattintható Google & Flashscore kereső linkek minden meccshez", style = MaterialTheme.typography.bodySmall)
+                                Text("• Egy-érintéses lista másolás és meccs hozzáadás a követőhöz tőkearányos téttel", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.2.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.2.0 (Előző kiadás)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
                                 Text("• Automatikus tőkearányos tétnövekedés (Tőke / 49.25 az Excel tábla szerint)", style = MaterialTheme.typography.bodySmall)
-                                Text("• Zárolt meccs tétkalkuláció: nincs szükség kézi tétbeírásra, a rendszer odds és kör alapján számol", style = MaterialTheme.typography.bodySmall)
-                                Text("• Közvetlen GitHub Releases APK önfrissítő motor (dzsolt5/ganrax)", style = MaterialTheme.typography.bodySmall)
-                                Text("• Beépített Verziókövető és APK sértetlenség-ellenőrző rendszer", style = MaterialTheme.typography.bodySmall)
+                                Text("• Zárolt meccs tétkalkuláció: odds és kör alapján számol", style = MaterialTheme.typography.bodySmall)
+                                Text("• Állandó aláírókulcs és beépített verziókövető", style = MaterialTheme.typography.bodySmall)
                             }
                         }
 

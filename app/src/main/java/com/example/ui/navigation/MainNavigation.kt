@@ -2,6 +2,7 @@ package com.example.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,6 +17,7 @@ import com.example.ui.screens.ai.AiAdvisorScreen
 import com.example.ui.screens.calculator.StakeCalculatorScreen
 import com.example.ui.screens.matches.MatchTrackerScreen
 import com.example.ui.screens.strategy.StrategyPlanScreen
+import com.example.ui.screens.telegram.TelegramAlertParserScreen
 import com.example.ui.screens.updater.InAppUpdateScreen
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.viewmodel.*
@@ -28,6 +30,7 @@ enum class NavigationTab(
     STRATEGY("Stratégia", Icons.AutoMirrored.Filled.TrendingUp, "nav_strategy"),
     CALCULATOR("Kalkulátor", Icons.Default.Calculate, "nav_calculator"),
     MATCHES("Meccsek", Icons.Default.SportsSoccer, "nav_matches"),
+    TELEGRAM("Telegram", Icons.AutoMirrored.Filled.Send, "nav_telegram"),
     AI_ADVISOR("AI Stratéga", Icons.Default.AutoAwesome, "nav_ai_advisor"),
     UPDATER("Frissítő", Icons.Default.SystemUpdate, "nav_updater")
 }
@@ -39,6 +42,7 @@ fun MainNavigation(app: BettingApp) {
     val strategyViewModel: StrategyViewModel = viewModel(factory = StrategyViewModel.Factory(app.repository))
     val calculatorViewModel: CalculatorViewModel = viewModel(factory = CalculatorViewModel.Factory(app.repository))
     val matchTrackerViewModel: MatchTrackerViewModel = viewModel(factory = MatchTrackerViewModel.Factory(app.repository))
+    val telegramParserViewModel: TelegramParserViewModel = viewModel(factory = TelegramParserViewModel.Factory(app.repository))
     val aiAdvisorViewModel: AiAdvisorViewModel = viewModel()
     val updateViewModel: UpdateViewModel = viewModel(factory = UpdateViewModel.Factory(app))
 
@@ -106,6 +110,18 @@ fun MainNavigation(app: BettingApp) {
                 NavigationTab.MATCHES -> {
                     MatchTrackerScreen(
                         viewModel = matchTrackerViewModel,
+                        onNavigateToCalculator = {
+                            currentTab = NavigationTab.CALCULATOR
+                        }
+                    )
+                }
+
+                NavigationTab.TELEGRAM -> {
+                    TelegramAlertParserScreen(
+                        viewModel = telegramParserViewModel,
+                        onNavigateToMatches = {
+                            currentTab = NavigationTab.MATCHES
+                        },
                         onNavigateToCalculator = {
                             currentTab = NavigationTab.CALCULATOR
                         }

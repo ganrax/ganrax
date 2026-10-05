@@ -55,9 +55,12 @@ jobs:
         with:
           files: release-output/tetmester-pro-latest.apk
           tag_name: latest
-          name: TétMester Pro (Legfrissebb Kiadás)
+          name: TétMester Pro v1.3.0 (Legfrissebb Kiadás)
           body: |
-            ###  TétMester Pro - Frissítés
+            ###  TétMester Pro v1.3.0 - Frissítés
+            - **Telegram Értesítés Feldolgozó (ganrax Alerts üzenetekből meccsek, csapatok és stratégiák kinyerése)**
+            - **Automatikus kattintható Google & Flashscore kereső linkek minden meccshez**
+            - **Egy-érintéses lista másolás és meccs hozzáadás a követőhöz tőkearányos téttel**
             - **Állandó beépített kulcs (Permanent Keystore)** - garantáltan egyező aláírás minden verziónál!
             - **100 Napos Kamatos Kamat Tétkezelő**
             - **Automatikus tőkearányos tétnövekedés (Tőke / 49.25)**

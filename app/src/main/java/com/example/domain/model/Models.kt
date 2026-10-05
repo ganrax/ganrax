@@ -72,3 +72,27 @@ data class AppUpdateInfo(
     val fileSizeMb: Double = 18.5,
     val releaseDate: String = "2026-10-04"
 )
+
+data class ParsedTelegramAlert(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val timestamp: String = "",
+    val strategyName: String = "",
+    val league: String = "",
+    val homeTeam: String = "",
+    val awayTeam: String = "",
+    val matchName: String = "",
+    val googleSearchUrl: String = "",
+    val flashscoreSearchUrl: String = "",
+    val timer: String = "",
+    val score: String = "",
+    val corners: String = "",
+    val momentum: String = "",
+    val attacks: String = "",
+    val dangerousAttacks: String = "",
+    val shotsOnTarget: String = "",
+    val possession: String = "",
+    val liveOdds1X2: String = "",
+    val bttsOdds: String = "",
+    val overUnderOdds: String = "",
+    val rawText: String = ""
+)

@@ -2,8 +2,10 @@ package com.example.network.updater
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.domain.model.AppUpdateInfo
@@ -14,7 +16,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -36,6 +37,8 @@ class InAppUpdaterService(private val context: Context) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     private val _updateState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
@@ -50,75 +53,72 @@ class InAppUpdaterService(private val context: Context) {
         val currentCode = getCurrentVersionCode()
         val currentName = getCurrentVersionName()
 
+        val repoPath = if (customUrl.isNotBlank()) customUrl.trim().removePrefix("https://github.com/").removePrefix("http://github.com/") else "dzsolt5/ganrax"
+        val directFallbackApkUrl = "https://github.com/$repoPath/releases/latest/download/tetmester-pro-latest.apk"
+
         try {
-            // Check if user provided a GitHub repo or direct releases API / JSON URL
-            val targetUrl = when {
-                customUrl.isNotBlank() && customUrl.startsWith("http") -> customUrl
-                customUrl.isNotBlank() && customUrl.contains("/") -> "https://api.github.com/repos/${customUrl.trim().removePrefix("https://github.com/")}/releases/latest"
-                else -> ""
-            }
+            val targetApiUrl = "https://api.github.com/repos/$repoPath/releases/latest"
 
-            if (targetUrl.isNotBlank()) {
-                val request = Request.Builder()
-                    .url(targetUrl)
-                    .header("Accept", "application/vnd.github.v3+json")
-                    .build()
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val jsonStr = response.body?.string() ?: ""
-                    val json = JSONObject(jsonStr)
+            val request = Request.Builder()
+                .url(targetApiUrl)
+                .header("Accept", "application/vnd.github.v3+json")
+                .header("User-Agent", "TetMesterPro-Android")
+                .build()
 
-                    var downloadUrl = ""
-                    var releaseNotes = json.optString("body", "Új GitHub verzió elérhető!")
-                    val tagName = json.optString("tag_name", "v1.1.0")
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val jsonStr = response.body?.string() ?: ""
+                val json = JSONObject(jsonStr)
 
-                    // Check GitHub Release assets for .apk file
-                    val assets = json.optJSONArray("assets")
-                    if (assets != null) {
-                        for (i in 0 until assets.length()) {
-                            val asset = assets.getJSONObject(i)
-                            val name = asset.optString("name", "")
-                            if (name.endsWith(".apk", ignoreCase = true)) {
-                                downloadUrl = asset.optString("browser_download_url", "")
-                                break
-                            }
+                var downloadUrl = ""
+                val releaseNotes = json.optString("body", "Új GitHub verzió elérhető!")
+                val tagName = json.optString("tag_name", "v1.3.0")
+
+                // Check GitHub Release assets for .apk file
+                val assets = json.optJSONArray("assets")
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val asset = assets.getJSONObject(i)
+                        val name = asset.optString("name", "")
+                        if (name.endsWith(".apk", ignoreCase = true)) {
+                            downloadUrl = asset.optString("browser_download_url", "")
+                            break
                         }
                     }
-
-                    if (downloadUrl.isBlank()) {
-                        downloadUrl = json.optString("downloadUrl", "")
-                    }
-
-                    val info = AppUpdateInfo(
-                        currentVersionCode = currentCode,
-                        currentVersionName = currentName,
-                        latestVersionCode = currentCode + 1,
-                        latestVersionName = tagName,
-                        releaseNotes = releaseNotes,
-                        downloadUrl = downloadUrl,
-                        isUpdateAvailable = true
-                    )
-                    _updateState.value = UpdateDownloadState.Available(info)
-                    return@withContext info
                 }
+
+                if (downloadUrl.isBlank()) {
+                    downloadUrl = directFallbackApkUrl
+                }
+
+                val info = AppUpdateInfo(
+                    currentVersionCode = currentCode,
+                    currentVersionName = currentName,
+                    latestVersionCode = currentCode + 1,
+                    latestVersionName = tagName,
+                    releaseNotes = releaseNotes,
+                    downloadUrl = downloadUrl,
+                    isUpdateAvailable = true
+                )
+                _updateState.value = UpdateDownloadState.Available(info)
+                return@withContext info
             }
 
-            // Default Release Info for TétMester Pro
+            // If API didn't return 200, return direct fallback info
             val defaultInfo = AppUpdateInfo(
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
                 latestVersionName = "v1.3.0 Pro",
                 releaseNotes = """
-                    • Telegram Értesítés Feldolgozó & Match Linker (Mérkőzések, stratégiák és Google kereső linkek kinyerése)
+                    • Telegram Értesítés Feldolgozó (Mérkőzések, stratégiák és Google kereső linkek kinyerése)
                     • 100 Napos Kamatos Kamat Tétkezelő (Valós idejű bankroll szimuláció)
                     • Automatikus tőkearányos tétnövekedés (Tőke / 49.25)
                     • 4-Körös és Kármentés Tétkalkulátor közvetlen meccs-hozzárendeléssel
                     • Élő mérkőzéskövető, eredményrögzítő és statisztikai ROI számítás
-                    • Gemini AI meccselemző és fogadási stratéga asszisztens
-                    • Közvetlen GitHub Releases APK önfrissítés
+                    • Állandó aláírókulcs és közvetlen GitHub Releases APK önfrissítés
                 """.trimIndent(),
-                downloadUrl = "",
+                downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,
                 fileSizeMb = 24.0,
                 releaseDate = "2026-10-04"
@@ -127,79 +127,72 @@ class InAppUpdaterService(private val context: Context) {
             _updateState.value = UpdateDownloadState.Available(defaultInfo)
             defaultInfo
         } catch (e: Exception) {
-            _updateState.value = UpdateDownloadState.Error("Nem sikerült elérni a frissítési kiszolgálót: ${e.localizedMessage}")
-            AppUpdateInfo(
+            val fallbackInfo = AppUpdateInfo(
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
-                isUpdateAvailable = false
+                latestVersionCode = currentCode + 1,
+                latestVersionName = "v1.3.0 Pro",
+                releaseNotes = "GitHub Releases frissítés (dzsolt5/ganrax).",
+                downloadUrl = directFallbackApkUrl,
+                isUpdateAvailable = true
             )
+            _updateState.value = UpdateDownloadState.Available(fallbackInfo)
+            fallbackInfo
         }
     }
 
     suspend fun downloadAndPrepareApk(downloadUrl: String) = withContext(Dispatchers.IO) {
         try {
             _updateState.value = UpdateDownloadState.Downloading(0, 0, 100)
-            val updatesDir = File(context.cacheDir, "updates")
+
+            // Prepare dedicated external/internal updates directory
+            val updatesDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: File(context.filesDir, "updates").apply { if (!exists()) mkdirs() }
             if (!updatesDir.exists()) updatesDir.mkdirs()
-            val targetApk = File(updatesDir, "tetmester_update.apk")
 
-            if (downloadUrl.startsWith("http")) {
-                val request = Request.Builder().url(downloadUrl).build()
-                val response = client.newCall(request).execute()
-                val body = response.body
+            val targetApk = File(updatesDir, "tetmester_pro_update.apk")
+            if (targetApk.exists()) targetApk.delete()
 
-                if (!response.isSuccessful || body == null) {
-                    _updateState.value = UpdateDownloadState.Error("Nem sikerült letölteni az APK fájlt a megadott címről (HTTP ${response.code}). Kérlek ellenőrizd a GitHub Release linket!")
-                    return@withContext
-                }
-
-                val totalBytes = body.contentLength().let { if (it <= 0) 24_000_000L else it }
-                var bytesRead = 0L
-                val buffer = ByteArray(16 * 1024)
-
-                body.byteStream().use { input ->
-                    FileOutputStream(targetApk).use { output ->
-                        var read: Int
-                        while (input.read(buffer).also { read = it } != -1) {
-                            output.write(buffer, 0, read)
-                            bytesRead += read
-                            val percent = ((bytesRead.toDouble() / totalBytes) * 100).toInt().coerceIn(0, 100)
-                            _updateState.value = UpdateDownloadState.Downloading(percent, bytesRead, totalBytes)
-                        }
-                    }
-                }
+            val actualUrl = if (downloadUrl.isNotBlank() && downloadUrl.startsWith("http")) {
+                downloadUrl
             } else {
-                // Check if we have an internal asset package
-                try {
-                    val assetManager = context.assets
-                    val hasAsset = try {
-                        assetManager.open("latest-release.apk").close()
-                        true
-                    } catch (e: Exception) {
-                        false
-                    }
+                "https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"
+            }
 
-                    if (hasAsset) {
-                        assetManager.open("latest-release.apk").use { input ->
-                            FileOutputStream(targetApk).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        _updateState.value = UpdateDownloadState.Downloading(100, targetApk.length(), targetApk.length())
-                    } else {
-                        _updateState.value = UpdateDownloadState.Error("Nincs megadva érvényes letöltési link. Kérlek másold be a GitHub Release APK linkjét a frissítéshez!")
-                        return@withContext
+            val request = Request.Builder()
+                .url(actualUrl)
+                .header("User-Agent", "TetMesterPro-Android")
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body
+
+            if (!response.isSuccessful || body == null) {
+                _updateState.value = UpdateDownloadState.Error("Nem sikerült letölteni az APK-t (HTTP ${response.code}). Ellenőrizd, hogy a GitHub Release elkészült-e a dzsolt5/ganrax oldalon!")
+                return@withContext
+            }
+
+            val totalBytes = body.contentLength().let { if (it <= 0) 24_000_000L else it }
+            var bytesRead = 0L
+            val buffer = ByteArray(32 * 1024)
+
+            body.byteStream().use { input ->
+                FileOutputStream(targetApk).use { output ->
+                    var read: Int
+                    while (input.read(buffer).also { read = it } != -1) {
+                        output.write(buffer, 0, read)
+                        bytesRead += read
+                        val percent = ((bytesRead.toDouble() / totalBytes) * 100).toInt().coerceIn(0, 100)
+                        _updateState.value = UpdateDownloadState.Downloading(percent, bytesRead, totalBytes)
                     }
-                } catch (e: Exception) {
-                    _updateState.value = UpdateDownloadState.Error("Hiba az APK előkészítése során: ${e.localizedMessage}")
-                    return@withContext
                 }
             }
 
-            // CRITICAL: Validate that targetApk is a genuine valid APK
+            // Validate that downloaded file is a genuine, non-corrupted APK archive
             if (!isValidApk(targetApk)) {
+                targetApk.delete()
                 _updateState.value = UpdateDownloadState.Error(
-                    "A letöltött fájl nem érvényes Android APK csomag (valószínűleg hibás link vagy még nincs feltöltve az APK a GitHub kiadáshoz). Ezért a rendszer elutasította a telepítést."
+                    "A letöltött fájl érvénytelen vagy sérült (valószínűleg a GitHub még nem fejezte be a release csatolását). Kérlek ellenőrizd az Actions zöld pipáját!"
                 )
                 return@withContext
             }
@@ -211,7 +204,7 @@ class InAppUpdaterService(private val context: Context) {
     }
 
     private fun isValidApk(file: File): Boolean {
-        if (!file.exists() || file.length() < 10000) return false
+        if (!file.exists() || file.length() < 100_000) return false
         return try {
             ZipFile(file).use { zip ->
                 zip.getEntry("AndroidManifest.xml") != null
@@ -249,7 +242,16 @@ class InAppUpdaterService(private val context: Context) {
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+
+            // Grant explicit URI permissions to all matching package installer handlers
+            val resInfoList = context.packageManager.queryIntentActivities(installIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            for (resolveInfo in resInfoList) {
+                val packageName = resolveInfo.activityInfo.packageName
+                context.grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
             context.startActivity(installIntent)
@@ -277,9 +279,9 @@ class InAppUpdaterService(private val context: Context) {
     private fun getCurrentVersionName(): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.0"
+            pInfo.versionName ?: "1.3.0"
         } catch (e: Exception) {
-            "1.0.0"
+            "1.3.0"
         }
     }
 }

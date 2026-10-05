@@ -15,7 +15,7 @@ android {
   defaultConfig {
     applicationId = "com.aistudio.tetkezelo.kxmpzq"
     minSdk = 24
-    targetSdk = 35
+    targetSdk = 34
     versionCode = 3
     versionName = "1.3.0"
 

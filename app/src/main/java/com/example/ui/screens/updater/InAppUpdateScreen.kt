@@ -1,5 +1,9 @@
 package com.example.ui.screens.updater
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -289,10 +293,71 @@ fun InAppUpdateScreen(
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(text = state.message, color = StatusLost, style = MaterialTheme.typography.bodySmall)
                                         Spacer(modifier = Modifier.height(6.dp))
-                                        TextButton(onClick = { viewModel.reset() }) {
-                                            Text("Újrapróbálás")
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            TextButton(onClick = { viewModel.reset() }) {
+                                                Text("Újrapróbálás", color = EmeraldPrimary)
+                                            }
+                                            TextButton(onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Nem sikerült megnyitni a böngészőt", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }) {
+                                                Text("Böngészős Letöltés", color = GoldOdds)
+                                            }
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // Direct Browser Download Alternative for Android 14
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dzsolt5/ganrax/releases/latest/download/tetmester-pro-latest.apk"))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Hiba: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Letöltés Böngészőből", fontSize = 12.sp)
+                            }
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                                data = Uri.parse("package:${context.packageName}")
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            val intent = Intent(Settings.ACTION_SECURITY_SETTINGS)
+                                            context.startActivity(intent)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Telepítés Engedélyezése", fontSize = 12.sp)
                                 }
                             }
                         }

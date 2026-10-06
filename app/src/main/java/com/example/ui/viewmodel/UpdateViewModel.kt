@@ -20,6 +20,9 @@ class UpdateViewModel(private val updaterService: InAppUpdaterService) : ViewMod
     private val _customUrlInput = MutableStateFlow("ganrax/ganrax")
     val customUrlInput: StateFlow<String> = _customUrlInput.asStateFlow()
 
+    private val _tokenInput = MutableStateFlow(updaterService.getGitHubToken())
+    val tokenInput: StateFlow<String> = _tokenInput.asStateFlow()
+
     private val _lastUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val lastUpdateInfo: StateFlow<AppUpdateInfo?> = _lastUpdateInfo.asStateFlow()
 
@@ -31,6 +34,11 @@ class UpdateViewModel(private val updaterService: InAppUpdaterService) : ViewMod
         _customUrlInput.value = url
     }
 
+    fun setToken(token: String) {
+        _tokenInput.value = token
+        updaterService.setGitHubToken(token)
+    }
+
     fun checkForUpdates() {
         viewModelScope.launch {
             val info = updaterService.checkForUpdates(_customUrlInput.value)
@@ -38,9 +46,9 @@ class UpdateViewModel(private val updaterService: InAppUpdaterService) : ViewMod
         }
     }
 
-    fun startDownload(downloadUrl: String) {
+    fun startDownload(downloadUrl: String, assetApiUrl: String = "") {
         viewModelScope.launch {
-            updaterService.downloadAndPrepareApk(downloadUrl)
+            updaterService.downloadAndPrepareApk(downloadUrl, assetApiUrl)
         }
     }
 

@@ -68,6 +68,7 @@ data class AppUpdateInfo(
     val latestVersionName: String = "1.1.0",
     val releaseNotes: String = "Új funkciók: Élő odds kalkulátor, intelligens kármentés javaslatok, finomhangolt 100 napos kamatos kamat görbe és javított mérkőzéskövetés.",
     val downloadUrl: String = "https://example.com/tetmester_pro_latest.apk",
+    val assetApiUrl: String = "",
     val isUpdateAvailable: Boolean = false,
     val fileSizeMb: Double = 18.5,
     val releaseDate: String = "2026-10-04"
@@ -114,4 +115,15 @@ data class CalculatorMatchItem(
     val potentialReturn: Double = 0.0,
     val netProfit: Double = 0.0,
     val isSavedToTracker: Boolean = false
+)
+
+data class ProgressionLevel(
+    val levelNumber: Int,
+    val matchName: String = "",
+    val strategyName: String = "",
+    val odds: Double = 1.50,
+    val stake: Double = 0.0,
+    val potentialReturn: Double = 0.0,
+    val netProfit: Double = 0.0,
+    val status: String = "PENDING" // "PENDING", "WON", "LOST"
 )

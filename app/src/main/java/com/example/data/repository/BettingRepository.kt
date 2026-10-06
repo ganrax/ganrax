@@ -183,6 +183,15 @@ class BettingRepository(
         }
     }
 
+    suspend fun addProfitToBank(profitDelta: Double) = withContext(Dispatchers.IO) {
+        val config = configDao.getConfig()
+        if (config != null) {
+            val updatedBank = (config.currentBank + profitDelta).coerceAtLeast(100.0)
+            val updatedBase = (updatedBank / 49.25).toInt().toDouble().coerceAtLeast(1.0)
+            configDao.update(config.copy(currentBank = updatedBank, baseStake = updatedBase))
+        }
+    }
+
     fun getMatchesForDay(dayNumber: Int): Flow<List<BetMatchEntity>> = betMatchDao.getMatchesForDay(dayNumber)
 
     suspend fun exportDataAsCsv(): String = withContext(Dispatchers.IO) {

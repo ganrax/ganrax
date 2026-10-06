@@ -1,5 +1,6 @@
 package com.example.ui.screens.updater
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +41,7 @@ fun InAppUpdateScreen(
     val context = LocalContext.current
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val customUrl by viewModel.customUrlInput.collectAsStateWithLifecycle()
+    val token by viewModel.tokenInput.collectAsStateWithLifecycle()
     val lastUpdateInfo by viewModel.lastUpdateInfo.collectAsStateWithLifecycle()
 
     var showCustomUrlDialog by remember { mutableStateOf(false) }
@@ -152,6 +155,166 @@ fun InAppUpdateScreen(
                 }
             }
 
+            // GitHub Private Access Token Card (2. Lehetőség - Privát repó appon belüli közvetlen elérése)
+            item {
+                val clipboardManager = LocalClipboardManager.current
+                var tokenText by remember(token) { mutableStateOf(token) }
+                var tokenVisible by remember { mutableStateOf(false) }
+
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (token.isNotBlank()) EmeraldPrimary.copy(alpha = 0.08f) else GoldOdds.copy(alpha = 0.08f)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (token.isNotBlank()) EmeraldPrimary.copy(alpha = 0.4f) else GoldOdds.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VpnKey,
+                                    contentDescription = null,
+                                    tint = if (token.isNotBlank()) EmeraldPrimary else GoldOdds,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    text = "Privát GitHub Kulcs (Token)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (token.isNotBlank()) StatusWon else GoldOdds
+                            ) {
+                                Text(
+                                    text = if (token.isNotBlank()) "AKTÍV ✓" else "SZÜKSÉGES",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = if (token.isNotBlank()) {
+                                "✓ A privát GitHub kulcsod el van mentve. A letöltés gombra kattintva az app közvetlenül, jelszókérés nélkül frissíti önmagát a zárt ganrax/ganrax repódból!"
+                            } else {
+                                "A kódod 100%-ban privát és védett. Ahhoz, hogy az app közvetlenül innen, a zárt repóból töltse le a frissítést, illeszd be a GitHub Tokenedet (csak egyszer kell megadni)!"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = tokenText,
+                            onValueChange = { tokenText = it },
+                            placeholder = { Text("ghp_... (GitHub Personal Access Token)") },
+                            singleLine = true,
+                            visualTransformation = if (tokenVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                    Icon(
+                                        imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Action Buttons: Paste from Clipboard, Save, Clear
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val clip = clipboardManager.getText()?.text
+                                    if (!clip.isNullOrBlank()) {
+                                        tokenText = clip.trim()
+                                        viewModel.setToken(clip.trim())
+                                        Toast.makeText(context, "Token beillesztve és elmentve!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "A vágólap üres!", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Beillesztés", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (tokenText.isNotBlank()) {
+                                        viewModel.setToken(tokenText.trim())
+                                        Toast.makeText(context, "Token sikeresen elmentve!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        viewModel.setToken("")
+                                        Toast.makeText(context, "Token törölve!", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Mentés", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
+
+                        // Generate Token quick link
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://github.com/settings/tokens/new?scopes=repo&description=TetMesterProUpdater")
+                                    )
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Hiba: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp), tint = GoldOdds)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Token Generálása a GitHubon (1 kattintás)", fontSize = 12.sp, color = GoldOdds, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
             // Download & Install Action Section
             item {
                 Card(
@@ -183,8 +346,17 @@ fun InAppUpdateScreen(
                             is UpdateDownloadState.Idle, is UpdateDownloadState.Available -> {
                                 Button(
                                     onClick = {
-                                        val url = lastUpdateInfo?.downloadUrl ?: "https://example.com/app.apk"
-                                        viewModel.startDownload(url)
+                                        if (token.isBlank()) {
+                                            Toast.makeText(
+                                                context,
+                                                "Kérlek illeszd be a fenti 'Privát GitHub Kulcs' mezőbe a tokenedet a letöltéshez!",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            val url = lastUpdateInfo?.downloadUrl ?: ""
+                                            val assetUrl = lastUpdateInfo?.assetApiUrl ?: ""
+                                            viewModel.startDownload(url, assetUrl)
+                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = EmeraldPrimary,
@@ -196,7 +368,7 @@ fun InAppUpdateScreen(
                                     Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Új Verzió Letöltése és Telepítése (${lastUpdateInfo?.latestVersionName ?: "v1.2.0"})",
+                                        text = "Új Verzió Letöltése és Telepítése (${lastUpdateInfo?.latestVersionName ?: "v1.5.0"})",
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -315,6 +487,25 @@ fun InAppUpdateScreen(
 
                         // Direct Browser Download Alternative for Android 14
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ganrax/ganrax/releases"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Hiba: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = GoldOdds, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Megnyitás a GitHub Appban (100% Privát)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -334,7 +525,7 @@ fun InAppUpdateScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Letöltés Böngészőből", fontSize = 12.sp)
+                                Text("Böngészős Letöltés", fontSize = 12.sp)
                             }
 
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -513,8 +704,29 @@ fun InAppUpdateScreen(
                             )
                         }
 
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = EmeraldPrimary.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = "100% Privát Repózitórium: a kódod és a programod titkosított, senki más nem fér hozzá!",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = EmeraldPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
                         Text(
-                            text = "Írd be a GitHub repository-d nevét (pl. ganrax/ganrax) vagy a közvetlen Release APK linket az automatikus GitHub frissítéshez:",
+                            text = "GitHub repository (ganrax/ganrax):",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -522,7 +734,7 @@ fun InAppUpdateScreen(
                         OutlinedTextField(
                             value = customUrl,
                             onValueChange = { viewModel.setCustomUrl(it) },
-                            placeholder = { Text("pl. felhasznalonev/repo vagy közvetlen URL") },
+                            placeholder = { Text("ganrax/ganrax") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
@@ -530,6 +742,20 @@ fun InAppUpdateScreen(
                                     Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Lekérdezés")
                                 }
                             }
+                        )
+
+                        Text(
+                            text = "GitHub Token (Privát repóhoz - Opcionális):",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = token,
+                            onValueChange = { viewModel.setToken(it) },
+                            placeholder = { Text("ghp_... (ha az appon belülről töltenéd le)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }

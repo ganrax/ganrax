@@ -34,6 +34,8 @@ sealed class UpdateDownloadState {
 
 class InAppUpdaterService(private val context: Context) {
 
+    private val prefs = context.getSharedPreferences("updater_prefs", Context.MODE_PRIVATE)
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -48,10 +50,19 @@ class InAppUpdaterService(private val context: Context) {
         _updateState.value = UpdateDownloadState.Idle
     }
 
+    fun getGitHubToken(): String {
+        return prefs.getString("github_token", "") ?: ""
+    }
+
+    fun setGitHubToken(token: String) {
+        prefs.edit().putString("github_token", token.trim()).apply()
+    }
+
     suspend fun checkForUpdates(customUrl: String = ""): AppUpdateInfo = withContext(Dispatchers.IO) {
         _updateState.value = UpdateDownloadState.Checking
         val currentCode = getCurrentVersionCode()
         val currentName = getCurrentVersionName()
+        val token = getGitHubToken()
 
         val repoPath = if (customUrl.isNotBlank()) customUrl.trim().removePrefix("https://github.com/").removePrefix("http://github.com/") else "ganrax/ganrax"
         val directFallbackApkUrl = "https://github.com/$repoPath/releases/latest/download/tetmester-pro-latest.apk"
@@ -59,20 +70,24 @@ class InAppUpdaterService(private val context: Context) {
         try {
             val targetApiUrl = "https://api.github.com/repos/$repoPath/releases/latest"
 
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(targetApiUrl)
                 .header("Accept", "application/vnd.github.v3+json")
                 .header("User-Agent", "TetMesterPro-Android")
-                .build()
 
-            val response = client.newCall(request).execute()
+            if (token.isNotBlank()) {
+                requestBuilder.header("Authorization", "Bearer $token")
+            }
+
+            val response = client.newCall(requestBuilder.build()).execute()
             if (response.isSuccessful) {
                 val jsonStr = response.body?.string() ?: ""
                 val json = JSONObject(jsonStr)
 
                 var downloadUrl = ""
-                val releaseNotes = json.optString("body", "Új GitHub verzió elérhető!")
-                val tagName = json.optString("tag_name", "v1.3.0")
+                var assetApiUrl = ""
+                val releaseNotes = json.optString("body", "Új verzió elérhető a ganrax/ganrax repóban!")
+                val tagName = json.optString("tag_name", "v1.5.0")
 
                 // Check GitHub Release assets for .apk file
                 val assets = json.optJSONArray("assets")
@@ -82,6 +97,7 @@ class InAppUpdaterService(private val context: Context) {
                         val name = asset.optString("name", "")
                         if (name.endsWith(".apk", ignoreCase = true)) {
                             downloadUrl = asset.optString("browser_download_url", "")
+                            assetApiUrl = asset.optString("url", "")
                             break
                         }
                     }
@@ -98,24 +114,37 @@ class InAppUpdaterService(private val context: Context) {
                     latestVersionName = tagName,
                     releaseNotes = releaseNotes,
                     downloadUrl = downloadUrl,
+                    assetApiUrl = assetApiUrl,
                     isUpdateAvailable = true
                 )
                 _updateState.value = UpdateDownloadState.Available(info)
                 return@withContext info
+            } else if (response.code == 404 && token.isBlank()) {
+                // Private repository without token
+                val privateInfo = AppUpdateInfo(
+                    currentVersionCode = currentCode,
+                    currentVersionName = currentName,
+                    latestVersionCode = currentCode + 1,
+                    latestVersionName = "v1.6.0 Pro",
+                    releaseNotes = "A repository privát (biztonságos). A legfrissebb APK közvetlenül a GitHub alkalmazásodból vagy az alábbi gombokkal tölthető le.",
+                    downloadUrl = directFallbackApkUrl,
+                    isUpdateAvailable = true
+                )
+                _updateState.value = UpdateDownloadState.Available(privateInfo)
+                return@withContext privateInfo
             }
 
-            // If API didn't return 200, return direct fallback info
+            // Fallback default info
             val defaultInfo = AppUpdateInfo(
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.5.0 Pro",
+                latestVersionName = "v1.6.0 Pro",
                 releaseNotes = """
-                    • Verziószám automatikus követése a GitHub Releases-ben (v1.5.0)
-                    • Egyetlen Letisztult Oldalon: Kalkulátor és Telegram Meccsek közvetlen kézi odds alapú számítással
-                    • Kézzel megadható oddsok és valós idejű tőkearányos tét/profit számítás
-                    • Közvetlen Google Keresés és 1-kattintásos rögzítés a Meccsekhez
-                    • Android 14 (API 34) natív optimalizáció és közvetlen APK frissítés
+                    • Új Dinamikus Szintlépcső Kalkulátor: csak a stratégia és a mérkőzés neve, kézzel megadott oddsokkal
+                    • Intelligens körkezelés: ha az 1. szint nyert, a kör azonnal lezárul és a tőke frissül
+                    • Automatikus veszteségmentés: ha veszít, a következő szint oddsához pontosan kiszámolja a szükséges tétet
+                    • Privát GitHub repó támogatás és 100% zárt forráskód
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,
@@ -131,7 +160,7 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
                 latestVersionName = "v1.5.0 Pro",
-                releaseNotes = "GitHub Releases frissítés (ganrax/ganrax).",
+                releaseNotes = "GitHub Releases frissítés (ganrax/ganrax - Privát).",
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true
             )
@@ -140,9 +169,10 @@ class InAppUpdaterService(private val context: Context) {
         }
     }
 
-    suspend fun downloadAndPrepareApk(downloadUrl: String) = withContext(Dispatchers.IO) {
+    suspend fun downloadAndPrepareApk(downloadUrl: String, assetApiUrl: String = "") = withContext(Dispatchers.IO) {
         try {
             _updateState.value = UpdateDownloadState.Downloading(0, 0, 100)
+            val token = getGitHubToken()
 
             // Prepare dedicated external/internal updates directory
             val updatesDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -152,22 +182,51 @@ class InAppUpdaterService(private val context: Context) {
             val targetApk = File(updatesDir, "tetmester_pro_update.apk")
             if (targetApk.exists()) targetApk.delete()
 
-            val actualUrl = if (downloadUrl.isNotBlank() && downloadUrl.startsWith("http")) {
+            // If we have a GitHub token and assetApiUrl for private repo, use API octet-stream download
+            val useApiDownload = token.isNotBlank() && assetApiUrl.isNotBlank()
+            val targetUrl = if (useApiDownload) {
+                assetApiUrl
+            } else if (downloadUrl.isNotBlank() && downloadUrl.startsWith("http")) {
                 downloadUrl
             } else {
                 "https://github.com/ganrax/ganrax/releases/latest/download/tetmester-pro-latest.apk"
             }
 
-            val request = Request.Builder()
-                .url(actualUrl)
+            val requestBuilder = Request.Builder()
+                .url(targetUrl)
                 .header("User-Agent", "TetMesterPro-Android")
-                .build()
 
-            val response = client.newCall(request).execute()
+            if (token.isNotBlank()) {
+                requestBuilder.header("Authorization", "Bearer $token")
+                if (useApiDownload) {
+                    requestBuilder.header("Accept", "application/octet-stream")
+                }
+            }
+
+            var response = client.newCall(requestBuilder.build()).execute()
+
+            // If GitHub API returns 302 redirect for octet-stream asset download, follow it to AWS S3 without the Authorization header
+            if (response.code in 301..308) {
+                val redirectLocation = response.header("Location")
+                if (!redirectLocation.isNullOrBlank()) {
+                    response.close()
+                    val s3Request = Request.Builder()
+                        .url(redirectLocation)
+                        .header("User-Agent", "TetMesterPro-Android")
+                        .build()
+                    response = client.newCall(s3Request).execute()
+                }
+            }
+
             val body = response.body
 
             if (!response.isSuccessful || body == null) {
-                _updateState.value = UpdateDownloadState.Error("Nem sikerült letölteni az APK-t (HTTP ${response.code}). Ellenőrizd, hogy a GitHub Release elkészült-e a ganrax/ganrax oldalon!")
+                val errorMsg = if (response.code == 404 && token.isBlank()) {
+                    "A repó privát (biztonságos), így a GitHub bejelentkezés nélkül blokkolta a letöltést. Koppints a 'Megnyitás a GitHub Appban' gombra, vagy adj meg egy privát GitHub tokent!"
+                } else {
+                    "Nem sikerült letölteni az APK-t (HTTP ${response.code}). Ellenőrizd az internetkapcsolatot vagy töltsd le a GitHub alkalmazásodból!"
+                }
+                _updateState.value = UpdateDownloadState.Error(errorMsg)
                 return@withContext
             }
 
@@ -191,7 +250,7 @@ class InAppUpdaterService(private val context: Context) {
             if (!isValidApk(targetApk)) {
                 targetApk.delete()
                 _updateState.value = UpdateDownloadState.Error(
-                    "A letöltött fájl érvénytelen vagy sérült (valószínűleg a GitHub még nem fejezte be a release csatolását). Kérlek ellenőrizd az Actions zöld pipáját!"
+                    "A letöltött fájl nem érvényes APK (valószínűleg a privát repó miatt a GitHub egy bejelentkezési oldalt adott vissza). Nyisd meg a GitHub mobil appot a letöltéshez!"
                 )
                 return@withContext
             }
@@ -278,9 +337,9 @@ class InAppUpdaterService(private val context: Context) {
     private fun getCurrentVersionName(): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.3.0"
+            pInfo.versionName ?: "1.5.0"
         } catch (e: Exception) {
-            "1.3.0"
+            "1.5.0"
         }
     }
 }

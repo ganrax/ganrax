@@ -392,7 +392,7 @@ fun InAppUpdateScreen(
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // v1.4.0
+                        // v1.5.0
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = EmeraldPrimary.copy(alpha = 0.08f),
@@ -405,7 +405,7 @@ fun InAppUpdateScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("v1.4.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
+                                    Text("v1.5.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = EmeraldPrimary,
@@ -414,10 +414,22 @@ fun InAppUpdateScreen(
                                         Text("AKTÍV", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
-                                Text("• Egyetlen közös képernyőn a Kalkulátor és a Telegram meccsek kézi odds alapú tétkezelése", style = MaterialTheme.typography.bodySmall)
-                                Text("• Letisztult 4 fül: Stratégia, Kalkulátor, Meccsek, Frissítő (felesleges aloldalak megszüntetve)", style = MaterialTheme.typography.bodySmall)
-                                Text("• Kézzel megadható odds és valós idejű tőkearányos tét és profit kijelzés", style = MaterialTheme.typography.bodySmall)
+                                Text("• Verziószám automatikus léptetése (v1.5.0) és külön GitHub Release bejegyzés generálása", style = MaterialTheme.typography.bodySmall)
+                                Text("• Közvetlen Telegram meccskinyerés és kézi odds alapú tétkezelés egyetlen képernyőn", style = MaterialTheme.typography.bodySmall)
                                 Text("• Közvetlen Google kereső link minden beillesztett meccshez", style = MaterialTheme.typography.bodySmall)
+                                Text("• Android 14 (API 34) optimalizáció és állandó aláírókulcs", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.4.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.4.0 (Előző kiadás)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
+                                Text("• Kalkulátor és Telegram kézi odds alapú tétkezelés integrációja", style = MaterialTheme.typography.bodySmall)
                             }
                         }
 

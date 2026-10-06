@@ -25,6 +25,17 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Extract App Version
+        id: version
+        run: |
+          VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | awk -F '"' '{print $2}')
+          VERSION_CODE=$(grep "versionCode =" app/build.gradle.kts | tr -dc '0-9')
+          if [ -z "$VERSION_NAME" ]; then VERSION_NAME="1.5.0"; fi
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "VERSION_TAG=v$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "=== Azonosított verzió: $VERSION_NAME (kód: $VERSION_CODE) ==="
+
       - name: Deploy Permanent Keystore and Environment
         run: |
           echo "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" | base64 --decode > debug.keystore
@@ -41,33 +52,36 @@ jobs:
       - name: Prepare Release Artifacts
         run: |
           mkdir -p release-output
+          VERSION_NAME="${{ steps.version.outputs.VERSION_NAME }}"
           cp app/build/outputs/apk/debug/app-debug.apk release-output/tetmester-pro-latest.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-output/tetmester-pro-v${VERSION_NAME}.apk
+          ls -la release-output/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: tetmester-pro-apk
-          path: release-output/tetmester-pro-latest.apk
+          path: release-output/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          files: release-output/tetmester-pro-latest.apk
-          tag_name: latest
-          name: TétMester Pro v1.3.0 (Legfrissebb Kiadás)
+          files: |
+            release-output/tetmester-pro-latest.apk
+            release-output/tetmester-pro-v${{ steps.version.outputs.VERSION_NAME }}.apk
+          tag_name: ${{ steps.version.outputs.VERSION_TAG }}
+          name: TétMester Pro v${{ steps.version.outputs.VERSION_NAME }}
+          make_latest: true
           body: |
-            ###  TétMester Pro v1.3.0 - Frissítés
+            ### 🚀 TétMester Pro v${{ steps.version.outputs.VERSION_NAME }} Frissítés
+            - **Automatikus verzió léptetés és külön Release bejegyzés (v${{ steps.version.outputs.VERSION_NAME }})**
+            - **Egyetlen közös oldalon a Kalkulátor és a Telegram meccsek kézi odds alapú tétkezelése**
             - **Telegram Értesítés Feldolgozó (ganrax Alerts üzenetekből meccsek, csapatok és stratégiák kinyerése)**
             - **Automatikus kattintható Google & Flashscore kereső linkek minden meccshez**
-            - **Egy-érintéses lista másolás és meccs hozzáadás a követőhöz tőkearányos téttel**
             - **Állandó beépített kulcs (Permanent Keystore)** - garantáltan egyező aláírás minden verziónál!
-            - **100 Napos Kamatos Kamat Tétkezelő**
-            - **Automatikus tőkearányos tétnövekedés (Tőke / 49.25)**
-            - **Többkörös & Kármentés Tétkalkulátor**
+            - **Android 14 (API 34) natív optimalizáció**
+            - **100 Napos Kamatos Kamat Tétkezelő (Tőke / 49.25)**
             - **Élő Mérkőzéskövető és AI meccselemző**
-            - **Alkalmazáson belüli egykattintásos frissítő**
-
-            *Telepítéshez töltsd le a lenti `tetmester-pro-latest.apk` fájlt.*
           draft: false
           prerelease: false

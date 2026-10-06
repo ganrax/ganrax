@@ -109,18 +109,18 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.4.0 Pro",
+                latestVersionName = "v1.5.0 Pro",
                 releaseNotes = """
+                    • Verziószám automatikus követése a GitHub Releases-ben (v1.5.0)
                     • Egyetlen Letisztult Oldalon: Kalkulátor és Telegram Meccsek közvetlen kézi odds alapú számítással
-                    • Felesleges fülek törölve: csak a Stratégia, Kalkulátor, Meccsek és Frissítő maradt
                     • Kézzel megadható oddsok és valós idejű tőkearányos tét/profit számítás
                     • Közvetlen Google Keresés és 1-kattintásos rögzítés a Meccsekhez
-                    • Android 14 (API 34) natív optimalizáció és megbízható csomagtelepítés
+                    • Android 14 (API 34) natív optimalizáció és közvetlen APK frissítés
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,
                 fileSizeMb = 24.0,
-                releaseDate = "2026-10-05"
+                releaseDate = "2026-10-06"
             )
 
             _updateState.value = UpdateDownloadState.Available(defaultInfo)
@@ -130,7 +130,7 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.4.0 Pro",
+                latestVersionName = "v1.5.0 Pro",
                 releaseNotes = "GitHub Releases frissítés (ganrax/ganrax).",
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true

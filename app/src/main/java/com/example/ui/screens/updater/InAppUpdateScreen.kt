@@ -583,7 +583,7 @@ fun InAppUpdateScreen(
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // v1.5.0
+                        // v1.8.0
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = EmeraldPrimary.copy(alpha = 0.08f),
@@ -596,19 +596,33 @@ fun InAppUpdateScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("v1.5.0 (Legújabb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
+                                    Text("v1.8.0 Pro (Telepített verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = EmeraldPrimary,
                                         modifier = Modifier.padding(2.dp)
                                     ) {
-                                        Text("AKTÍV", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                        Text("AKTÍV ✓", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
-                                Text("• Verziószám automatikus léptetése (v1.5.0) és külön GitHub Release bejegyzés generálása", style = MaterialTheme.typography.bodySmall)
+                                Text("• Verziószám és verziójelvény megjelenítése minden képernyő fejlécében és a frissítőben", style = MaterialTheme.typography.bodySmall)
+                                Text("• Beépített intelligens offline fogadási szakértő motor (internet és API kulcs nélkül)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Egyedi odds alapú tétszámítás és mérkőzésmentés a helyi adatbázisba", style = MaterialTheme.typography.bodySmall)
+                                Text("• 4-körös tétkezelő és kamatos kamat stratégiai útmutatók", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.5.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.5.0 (Előző kiadás)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
+                                Text("• Verziószám automatikus léptetése és külön GitHub Release bejegyzés generálása", style = MaterialTheme.typography.bodySmall)
                                 Text("• Közvetlen Telegram meccskinyerés és kézi odds alapú tétkezelés egyetlen képernyőn", style = MaterialTheme.typography.bodySmall)
                                 Text("• Közvetlen Google kereső link minden beillesztett meccshez", style = MaterialTheme.typography.bodySmall)
-                                Text("• Android 14 (API 34) optimalizáció és állandó aláírókulcs", style = MaterialTheme.typography.bodySmall)
                             }
                         }
 

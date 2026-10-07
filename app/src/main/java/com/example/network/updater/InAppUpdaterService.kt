@@ -159,7 +159,7 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.5.0 Pro",
+                latestVersionName = "v1.8.0 Pro",
                 releaseNotes = "GitHub Releases frissítés (ganrax/ganrax - Privát).",
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true
@@ -337,9 +337,9 @@ class InAppUpdaterService(private val context: Context) {
     private fun getCurrentVersionName(): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.5.0"
+            pInfo.versionName ?: "1.8.0"
         } catch (e: Exception) {
-            "1.5.0"
+            "1.8.0"
         }
     }
 }

@@ -125,7 +125,7 @@ class InAppUpdaterService(private val context: Context) {
                     currentVersionCode = currentCode,
                     currentVersionName = currentName,
                     latestVersionCode = currentCode + 1,
-                    latestVersionName = "v1.6.0 Pro",
+                    latestVersionName = "v1.7.0 Pro",
                     releaseNotes = "A repository privát (biztonságos). A legfrissebb APK közvetlenül a GitHub alkalmazásodból vagy az alábbi gombokkal tölthető le.",
                     downloadUrl = directFallbackApkUrl,
                     isUpdateAvailable = true
@@ -139,12 +139,12 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.6.0 Pro",
+                latestVersionName = "v1.7.0 Pro",
                 releaseNotes = """
-                    • Új Dinamikus Szintlépcső Kalkulátor: csak a stratégia és a mérkőzés neve, kézzel megadott oddsokkal
-                    • Intelligens körkezelés: ha az 1. szint nyert, a kör azonnal lezárul és a tőke frissül
-                    • Automatikus veszteségmentés: ha veszít, a következő szint oddsához pontosan kiszámolja a szükséges tétet
-                    • Privát GitHub repó támogatás és 100% zárt forráskód
+                    • Valós idejű egyedi odds alapú tétszámítás (azonnal mutatja a pontos tétet minden szorzónál)
+                    • Mérkőzések elmentése későbbre a helyi adatbázisba (egy kattintással visszatölthető és elszámolható)
+                    • Intelligens szintlépcső: ha nyer az 1. szinten, a kör megáll és jóváírja a profitot; ha veszít, számolja a tétet a következő szintre
+                    • Privát GitHub repó támogatás (ganrax/ganrax)
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,

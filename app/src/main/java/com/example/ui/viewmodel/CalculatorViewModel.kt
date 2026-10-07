@@ -8,6 +8,7 @@ import com.example.data.repository.BettingRepository
 import com.example.domain.calculator.BettingMathEngine
 import com.example.domain.model.CalculatorMatchItem
 import com.example.domain.model.CalculatorMode
+import com.example.domain.model.MatchStatus
 import com.example.domain.model.PresetOddsRow
 import com.example.domain.model.ProgressionLevel
 import com.example.domain.model.RoundStakeResult
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,50 @@ class CalculatorViewModel(private val repository: BettingRepository) : ViewModel
     private val _lastWonProfit = MutableStateFlow(0.0)
     val lastWonProfit: StateFlow<Double> = _lastWonProfit.asStateFlow()
 
+    // REAL-TIME REACTIVE STAKE CALCULATION (MINDEN ODDS VÁLTOZÁS AZONNAL ÚJRASZÁMOLÓDIK!)
+    val currentCalculatedStake: StateFlow<Double> = combine(
+        combine(_activeLevel, _currentOddsInput, _accumulatedLoss) { level, odds, loss ->
+            Triple(level, odds, loss)
+        },
+        combine(_baseStakeInput, _targetProfitInput, _mode) { base, target, mode ->
+            Triple(base, target, mode)
+        }
+    ) { (level, oddsStr, loss), (baseStr, targetStr, mode) ->
+        val cleanOdds = oddsStr.replace(",", ".").trim().toDoubleOrNull()?.coerceAtLeast(1.02) ?: 1.50
+        val base = baseStr.toDoubleOrNull() ?: 203.0
+        val target = targetStr.toDoubleOrNull() ?: base
+        val divisor = (cleanOdds - 1.0).coerceAtLeast(0.01)
+
+        val stake = if (mode == CalculatorMode.TARGET_PROFIT) {
+            // Kitűzött profit elérése + összes korábbi veszteség megtérülése az egyedi odds-szal!
+            (loss + target) / divisor
+        } else {
+            if (level == 1) base else loss / divisor
+        }
+        kotlin.math.ceil(stake).coerceAtLeast(1.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 203.0)
+
+    val currentPotentialReturn: StateFlow<Double> = combine(
+        currentCalculatedStake,
+        _currentOddsInput
+    ) { stake, oddsStr ->
+        val cleanOdds = oddsStr.replace(",", ".").trim().toDoubleOrNull()?.coerceAtLeast(1.02) ?: 1.50
+        stake * cleanOdds
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 304.5)
+
+    val currentNetProfit: StateFlow<Double> = combine(
+        currentPotentialReturn,
+        currentCalculatedStake,
+        _accumulatedLoss
+    ) { potentialReturn, stake, loss ->
+        potentialReturn - (loss + stake)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 101.5)
+
+    // Saved Pending Matches (Későbbre elmentett meccsek a helyi adatbázisból!)
+    val savedPendingMatches: StateFlow<List<BetMatchEntity>> = repository.allMatches
+        .map { list -> list.filter { it.status.equals("PENDING", ignoreCase = true) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Standard progression ladder for overview
     private val _roundOdds = MutableStateFlow(listOf("1.50", "1.50", "1.50", "1.50"))
     val roundOdds: StateFlow<List<String>> = _roundOdds.asStateFlow()
@@ -80,7 +126,7 @@ class CalculatorViewModel(private val repository: BettingRepository) : ViewModel
         val bank = bankStr.toDoubleOrNull() ?: 10000.0
         val base = baseStr.toDoubleOrNull() ?: 203.0
         val target = targetStr.toDoubleOrNull() ?: base
-        val odds = oddsStrings.map { it.toDoubleOrNull() ?: 1.50 }
+        val odds = oddsStrings.map { it.replace(",", ".").toDoubleOrNull() ?: 1.50 }
 
         BettingMathEngine.calculateProgression(
             currentBank = bank,
@@ -223,36 +269,84 @@ Both Teams To Score:
         _currentOddsInput.value = newOdds
     }
 
-    fun calculateStakeForCurrentLevel(): Double {
-        val odds = _currentOddsInput.value.toDoubleOrNull()?.coerceAtLeast(1.05) ?: 1.50
-        val base = _baseStakeInput.value.toDoubleOrNull() ?: 203.0
-        val target = _targetProfitInput.value.toDoubleOrNull() ?: base
-        val loss = _accumulatedLoss.value
-        val level = _activeLevel.value
+    fun applyPresetOdd(odds: Double) {
+        val formatted = String.format(java.util.Locale.US, "%.2f", odds)
+        _currentOddsInput.value = formatted
+    }
 
-        return if (level == 1) {
-            base
-        } else {
-            val divisor = (odds - 1.0).coerceAtLeast(0.05)
-            if (_mode.value == CalculatorMode.TARGET_PROFIT) {
-                (target + loss) / divisor
-            } else {
-                loss / divisor
-            }
+    /**
+     * MENTÉS KÉSŐBBRE: Elmenti az aktuális mérkőzést az adatbázisba PENDING státusszal,
+     * a kiválasztott oddsszal és kiszámított téttel, így később bármikor visszatölthető!
+     */
+    fun saveCurrentMatchForLater(onSavedToast: (String) -> Unit) {
+        val currentMatch = _selectedMatch.value
+        val matchName = currentMatch?.matchName ?: "Kiválasztott Mérkőzés"
+        val strategy = currentMatch?.strategyName ?: "Telegram Alert"
+        val odds = _currentOddsInput.value.replace(",", ".").trim().toDoubleOrNull() ?: 1.50
+        val stake = currentCalculatedStake.value
+
+        viewModelScope.launch {
+            val entity = BetMatchEntity(
+                dayNumber = currentBank.value?.activeDay ?: 1,
+                roundNumber = _activeLevel.value,
+                sport = "Labdarúgás",
+                league = currentMatch?.league ?: "",
+                homeTeam = currentMatch?.homeTeam ?: "Hazai",
+                awayTeam = currentMatch?.awayTeam ?: "Vendég",
+                market = "Szint ${_activeLevel.value}",
+                tip = strategy,
+                odds = odds,
+                stake = stake,
+                status = "PENDING",
+                notes = "$strategy | Mentve későbbi megjátszásra"
+            )
+            repository.insertMatch(entity)
+            onSavedToast("💾 '$matchName' sikeresen elmentve későbbre!")
         }
     }
 
-    fun calculatePotentialReturn(): Double {
-        val stake = calculateStakeForCurrentLevel()
-        val odds = _currentOddsInput.value.toDoubleOrNull()?.coerceAtLeast(1.05) ?: 1.50
-        return stake * odds
+    /**
+     * Elmentett meccs betöltése a kalkulátorba
+     */
+    fun loadSavedMatchIntoCalculator(match: BetMatchEntity) {
+        _selectedMatch.value = CalculatorMatchItem(
+            homeTeam = match.homeTeam,
+            awayTeam = match.awayTeam,
+            matchName = "${match.homeTeam} vs ${match.awayTeam}",
+            strategyName = match.tip,
+            league = match.league,
+            oddsInput = match.odds.toString()
+        )
+        _currentOddsInput.value = String.format(java.util.Locale.US, "%.2f", match.odds)
+        _activeLevel.value = match.roundNumber
     }
 
-    fun calculateNetProfitIfWon(): Double {
-        val ret = calculatePotentialReturn()
-        val stake = calculateStakeForCurrentLevel()
-        val totalInvested = _accumulatedLoss.value + stake
-        return ret - totalInvested
+    /**
+     * Elmentett meccs törlése
+     */
+    fun deleteSavedMatch(matchId: Long, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteMatch(matchId)
+            onDeleted()
+        }
+    }
+
+    /**
+     * Elmentett meccs közvetlen elszámolása (NYERT / VESZTETT)
+     */
+    fun settleSavedMatch(match: BetMatchEntity, won: Boolean, onSettleToast: (String) -> Unit) {
+        viewModelScope.launch {
+            val status = if (won) MatchStatus.WON else MatchStatus.LOST
+            repository.settleMatch(match.id, status)
+            if (won) {
+                val netProfit = match.stake * (match.odds - 1.0)
+                onSettleToast("🎉 ${match.homeTeam} vs ${match.awayTeam} NYERT! +${netProfit.toInt()} Ft jóváírva a tőkében!")
+            } else {
+                _accumulatedLoss.value += match.stake
+                _activeLevel.value += 1
+                onSettleToast("🔴 ${match.homeTeam} vs ${match.awayTeam} VESZTETT (-${match.stake.toInt()} Ft). Szint növelve: ${_activeLevel.value}")
+            }
+        }
     }
 
     /**
@@ -266,10 +360,10 @@ Both Teams To Score:
      */
     fun recordLevelResult(won: Boolean, onCompletedToast: (String) -> Unit) {
         val currentLevelNum = _activeLevel.value
-        val odds = _currentOddsInput.value.toDoubleOrNull()?.coerceAtLeast(1.05) ?: 1.50
-        val stake = calculateStakeForCurrentLevel()
-        val ret = calculatePotentialReturn()
-        val netProfit = calculateNetProfitIfWon()
+        val odds = _currentOddsInput.value.replace(",", ".").trim().toDoubleOrNull()?.coerceAtLeast(1.02) ?: 1.50
+        val stake = currentCalculatedStake.value
+        val ret = currentPotentialReturn.value
+        val netProfit = currentNetProfit.value
         val currentMatch = _selectedMatch.value
 
         val matchName = currentMatch?.matchName ?: "Kör $currentLevelNum Fogadás"
@@ -356,7 +450,7 @@ Both Teams To Score:
                     _selectedMatch.value = _extractedMatches.value[nextIndex]
                 }
 
-                onCompletedToast("🔴 $currentLevelNum. Szint veszített (-${stake.toInt()} Ft). Szükséges tét kiszámítva a(z) ${_activeLevel.value}. szintre!")
+                onCompletedToast("🔴 $currentLevelNum. Szint veszített (-${stake.toInt()} Ft). Szükséges tét újraszámolva a(z) ${_activeLevel.value}. szintre!")
             }
         }
     }
@@ -368,19 +462,6 @@ Both Teams To Score:
         _isSeriesCompleted.value = false
         _lastWonProfit.value = 0.0
         _currentOddsInput.value = "1.50"
-    }
-
-    fun updateOdd(roundIndex: Int, oddStr: String) {
-        val current = _roundOdds.value.toMutableList()
-        if (roundIndex in current.indices) {
-            current[roundIndex] = oddStr
-            _roundOdds.value = current
-        }
-    }
-
-    fun applyPresetOdd(odds: Double) {
-        val formatted = String.format(java.util.Locale.US, "%.2f", odds)
-        _currentOddsInput.value = formatted
     }
 
     class Factory(private val repository: BettingRepository) : ViewModelProvider.Factory {

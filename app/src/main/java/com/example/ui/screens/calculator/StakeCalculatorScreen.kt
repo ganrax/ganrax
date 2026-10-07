@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.local.entity.BetMatchEntity
 import com.example.domain.calculator.BettingMathEngine
 import com.example.domain.model.CalculatorMatchItem
 import com.example.domain.model.CalculatorMode
@@ -66,12 +67,16 @@ fun StakeCalculatorScreen(
     val isSeriesCompleted by viewModel.isSeriesCompleted.collectAsStateWithLifecycle()
     val lastWonProfit by viewModel.lastWonProfit.collectAsStateWithLifecycle()
 
+    // Real-time reactive calculated stake, return and profit!
+    val calculatedStake by viewModel.currentCalculatedStake.collectAsStateWithLifecycle()
+    val potentialReturn by viewModel.currentPotentialReturn.collectAsStateWithLifecycle()
+    val netProfitIfWon by viewModel.currentNetProfit.collectAsStateWithLifecycle()
+
+    // Saved pending matches (Persisted in Room Database!)
+    val savedPendingMatches by viewModel.savedPendingMatches.collectAsStateWithLifecycle()
+
     val progressionResults by viewModel.progressionResults.collectAsStateWithLifecycle()
     val roundOdds by viewModel.roundOdds.collectAsStateWithLifecycle()
-
-    val calculatedStake = viewModel.calculateStakeForCurrentLevel()
-    val potentialReturn = viewModel.calculatePotentialReturn()
-    val netProfitIfWon = viewModel.calculateNetProfitIfWon()
 
     var showLadderDetails by remember { mutableStateOf(false) }
 
@@ -349,10 +354,10 @@ fun StakeCalculatorScreen(
                             }
                         }
 
-                        // Extracted Matches Selection Chips (if multiple matches exist)
+                        // Extracted Matches Selection Chips
                         if (extractedMatches.isNotEmpty()) {
                             Text(
-                                text = "Kinyert mérkőzés kiválasztása:",
+                                text = "Kinyert mérkőzés kiválasztása a számításhoz:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -603,7 +608,7 @@ fun StakeCalculatorScreen(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = "Add meg a fogadóiroda szorzóját",
+                                            text = "Írd be a szorzót (azonnal újraszámolja a tétet)",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -617,7 +622,7 @@ fun StakeCalculatorScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         textStyle = LocalTextStyle.current.copy(
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
+                                            fontSize = 17.sp,
                                             color = GoldOdds,
                                             textAlign = TextAlign.Center
                                         ),
@@ -656,11 +661,11 @@ fun StakeCalculatorScreen(
                                     }
                                 }
 
-                                // Calculated Stakes Display Box
+                                // DYNAMIC CALCULATED STAKES DISPLAY BOX (VALÓS IDŐBEN FRISSÜL!)
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = EmeraldPrimary.copy(alpha = 0.12f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.4f)),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = EmeraldPrimary.copy(alpha = 0.15f),
+                                    border = androidx.compose.foundation.BorderStroke(1.5.dp, EmeraldPrimary.copy(alpha = 0.6f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
@@ -674,14 +679,14 @@ fun StakeCalculatorScreen(
                                         ) {
                                             Column {
                                                 Text(
-                                                    text = "SZÜKSÉGES TÉT ÖSSZEGE:",
+                                                    text = "SZÜKSÉGES TÉT ENNÉL AZ ODSS-NÁL:",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
                                                     text = BettingMathEngine.formatCurrency(calculatedStake),
-                                                    style = MaterialTheme.typography.headlineSmall,
+                                                    style = MaterialTheme.typography.headlineMedium,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = EmeraldPrimary
                                                 )
@@ -702,7 +707,7 @@ fun StakeCalculatorScreen(
                                             }
                                         }
 
-                                        HorizontalDivider(color = EmeraldPrimary.copy(alpha = 0.2f))
+                                        HorizontalDivider(color = EmeraldPrimary.copy(alpha = 0.25f))
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -710,7 +715,7 @@ fun StakeCalculatorScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = if (activeLevel == 1) "1. szint nyeresége:" else "Összes veszteség megtérülve + profit:",
+                                                text = if (activeLevel == 1) "1. szint tiszta nyeresége:" else "Összes korábbi veszteség megtérülve + nyereség:",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -718,10 +723,29 @@ fun StakeCalculatorScreen(
                                                 text = "+${BettingMathEngine.formatCurrency(netProfitIfWon)} tiszta profit",
                                                 fontWeight = FontWeight.Bold,
                                                 color = StatusWon,
-                                                fontSize = 12.sp
+                                                fontSize = 13.sp
                                             )
                                         }
                                     }
+                                }
+
+                                // MENTÉS KÉSŐBBRE GOMB (PERSISTENCE)
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.saveCurrentMatchForLater { msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = EmeraldPrimary
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.7f)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.BookmarkBorder, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("💾 Mérkőzés Mentése Későbbre (Odds: $currentOdds | Tét: ${calculatedStake.toInt()} Ft)", fontWeight = FontWeight.Bold)
                                 }
 
                                 // LEVEL OUTCOME ACTION BUTTONS (NYERT vs VESZTETT)
@@ -763,6 +787,156 @@ fun StakeCalculatorScreen(
                                         Icon(imageVector = Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("🔴 VESZTETT", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // KÉSŐBBRE ELMENTETT MECCSEK SZEKCIÓ (PERSISTED SAVED MATCHES)
+            if (savedPendingMatches.isNotEmpty()) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Bookmark, contentDescription = null, tint = GoldOdds, modifier = Modifier.size(20.dp))
+                                    Text(
+                                        text = "Későbbre Elmentett Meccsek (${savedPendingMatches.size})",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            savedPendingMatches.forEach { savedMatch ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${savedMatch.homeTeam} vs ${savedMatch.awayTeam}",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = GoldOdds.copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "${savedMatch.roundNumber}. Szint",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = GoldOdds,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${savedMatch.tip} | Odds: ${String.format(java.util.Locale.US, "%.2f", savedMatch.odds)} | Tét: ${BettingMathEngine.formatCurrency(savedMatch.stake)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = EmeraldPrimary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+
+                                        // Action buttons on saved match: Load, Win, Lose, Delete
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.loadSavedMatchIntoCalculator(savedMatch)
+                                                    Toast.makeText(context, "${savedMatch.homeTeam} vs ${savedMatch.awayTeam} betöltve a kalkulátorba!", Toast.LENGTH_SHORT).show()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1.3f),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Betöltés", fontSize = 11.sp)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    viewModel.settleSavedMatch(savedMatch, won = true) { msg ->
+                                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = StatusWon, contentColor = Color.Black),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Nyert", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    viewModel.settleSavedMatch(savedMatch, won = false) { msg ->
+                                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = StatusLost, contentColor = Color.White),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Vesztett", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    viewModel.deleteSavedMatch(savedMatch.id) {
+                                                        Toast.makeText(context, "Meccs törölve!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Törlés", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
                                     }
                                 }
                             }

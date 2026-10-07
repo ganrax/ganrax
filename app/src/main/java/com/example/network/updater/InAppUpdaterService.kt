@@ -125,7 +125,7 @@ class InAppUpdaterService(private val context: Context) {
                     currentVersionCode = currentCode,
                     currentVersionName = currentName,
                     latestVersionCode = currentCode + 1,
-                    latestVersionName = "v1.7.0 Pro",
+                    latestVersionName = "v1.8.0 Pro",
                     releaseNotes = "A repository privát (biztonságos). A legfrissebb APK közvetlenül a GitHub alkalmazásodból vagy az alábbi gombokkal tölthető le.",
                     downloadUrl = directFallbackApkUrl,
                     isUpdateAvailable = true
@@ -139,12 +139,12 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.7.0 Pro",
+                latestVersionName = "v1.8.0 Pro",
                 releaseNotes = """
-                    • Valós idejű egyedi odds alapú tétszámítás (azonnal mutatja a pontos tétet minden szorzónál)
-                    • Mérkőzések elmentése későbbre a helyi adatbázisba (egy kattintással visszatölthető és elszámolható)
-                    • Intelligens szintlépcső: ha nyer az 1. szinten, a kör megáll és jóváírja a profitot; ha veszít, számolja a tétet a következő szintre
-                    • Privát GitHub repó támogatás (ganrax/ganrax)
+                    • Beépített intelligens offline AI bot: internet és API kulcs nélkül is precíz tétszámítás és stratégiai válaszok
+                    • 400-as API hiba végleges javítása, zökkenőmentes automatikus fallback
+                    • Opcionális saját Gemini API kulcs beállítási lehetőség az AI fülön
+                    • Valós idejű egyedi odds alapú tétszámítás és meccsmentés
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,

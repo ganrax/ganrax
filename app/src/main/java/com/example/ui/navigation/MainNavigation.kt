@@ -43,7 +43,7 @@ fun MainNavigation(app: BettingApp) {
     val calculatorViewModel: CalculatorViewModel = viewModel(factory = CalculatorViewModel.Factory(app.repository))
     val matchTrackerViewModel: MatchTrackerViewModel = viewModel(factory = MatchTrackerViewModel.Factory(app.repository))
     val telegramParserViewModel: TelegramParserViewModel = viewModel(factory = TelegramParserViewModel.Factory(app.repository))
-    val aiAdvisorViewModel: AiAdvisorViewModel = viewModel()
+    val aiAdvisorViewModel: AiAdvisorViewModel = viewModel(factory = AiAdvisorViewModel.Factory(app))
     val updateViewModel: UpdateViewModel = viewModel(factory = UpdateViewModel.Factory(app))
 
     Scaffold(

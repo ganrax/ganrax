@@ -1,6 +1,9 @@
 package com.example.ui.screens.ai
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,11 +36,15 @@ import com.example.ui.viewmodel.AiAdvisorViewModel
 fun AiAdvisorScreen(
     viewModel: AiAdvisorViewModel
 ) {
+    val context = LocalContext.current
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val hasCustomApiKey by viewModel.hasCustomApiKey.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     var inputMessage by remember { mutableStateOf("") }
+    var showApiKeyDialog by remember { mutableStateOf(false) }
+    var apiKeyInput by remember { mutableStateOf("") }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -56,7 +64,8 @@ fun AiAdvisorScreen(
         topBar = {
             AppHeader(
                 title = "AI Stratéga Asszisztens",
-                subtitle = "Személyre szabott fogadási tanácsadó",
+                subtitle = if (hasCustomApiKey) "Gemini Felhő AI aktív" else "Beépített offline szakértő motor",
+                onSettingsClick = { showApiKeyDialog = true },
                 onExportClick = { viewModel.clearHistory() }
             )
         },
@@ -67,11 +76,57 @@ fun AiAdvisorScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Engine status banner
+            Surface(
+                color = if (hasCustomApiKey) EmeraldPrimary.copy(alpha = 0.12f) else CyanAccent.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clickable { showApiKeyDialog = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = if (hasCustomApiKey) Icons.Default.CloudDone else Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = if (hasCustomApiKey) EmeraldPrimary else CyanAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = if (hasCustomApiKey) "Online Gemini AI mód aktív" else "Beépített matematikai offline motor (100% működik)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    TextButton(
+                        onClick = { showApiKeyDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = if (hasCustomApiKey) "Módosítás" else "API Kulcs",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CyanAccent
+                        )
+                    }
+                }
+            }
+
             // Quick Questions Carousel
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(quickQuestions) { q ->
@@ -122,7 +177,7 @@ fun AiAdvisorScreen(
                                 strokeWidth = 2.dp
                             )
                             Text(
-                                text = "Az AI stratéga válaszol...",
+                                text = "Az AI stratéga számol...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -182,6 +237,105 @@ fun AiAdvisorScreen(
             }
         }
     }
+
+    if (showApiKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showApiKeyDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Key,
+                        contentDescription = null,
+                        tint = CyanAccent
+                    )
+                    Text(
+                        text = "Google Gemini AI Kulcs",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Az app mostantól offline módban is azonnal és tökéletesen válaszol a beépített matematikai szakértővel.\n\nHa szeretnéd a Google Gemini valós idejű felhős AI modelljét használni élő webes kereséssel, illeszd be a saját ingyenes API kulcsodat:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = apiKeyInput,
+                        onValueChange = { apiKeyInput = it },
+                        label = { Text("Gemini API Kulcs (AIzaSy...)") },
+                        placeholder = { Text("AIzaSy...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    TextButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://aistudio.google.com/apikey")
+                                )
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Ingyenes API kulcs igénylése (AI Studio)",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (apiKeyInput.isNotBlank()) {
+                            viewModel.setCustomApiKey(apiKeyInput.trim())
+                            apiKeyInput = ""
+                            showApiKeyDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                ) {
+                    Text("Mentés", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (hasCustomApiKey) {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearCustomApiKey()
+                                showApiKeyDialog = false
+                            }
+                        ) {
+                            Text("Kulcs törlése", color = StatusLost)
+                        }
+                    }
+                    TextButton(onClick = { showApiKeyDialog = false }) {
+                        Text("Bezárás")
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -218,7 +372,7 @@ fun ChatMessageBubble(message: ChatMessage) {
                 bottomEnd = if (isUser) 4.dp else 16.dp
             ),
             color = if (isUser) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.widthIn(max = 300.dp)
+            modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Text(
                 text = message.content,

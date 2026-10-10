@@ -1335,6 +1335,7 @@ fun IdentifySavedMatchDialog(
                 onClick = {
                     onSave(homeTeam.trim(), awayTeam.trim(), strategy.trim())
                 },
+                enabled = homeTeam.isNotBlank() && awayTeam.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black),
                 shape = RoundedCornerShape(10.dp)
             ) {

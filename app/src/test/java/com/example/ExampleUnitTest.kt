@@ -87,4 +87,46 @@ class ExampleUnitTest {
         assertEquals(0.0, results[2].netProfit, 0.1)
         assertEquals(0.0, results[3].netProfit, 0.1)
     }
+
+    @Test
+    fun testTelegramAlertParserAndTeamIdentification() {
+        val message = """
+            [2026. 10. 04. 20:52] ⚽️ ganrax Alerts: 🔔 ⚡Second Half Action Ready
+
+            🇮🇱 Israel Liga Bet South 
+            Bnei Yehud vs Maccabi Amishav Petah Tikva
+            🟥🟩🟥🟩🟥 - 🟩🟩🟨🟩🟥
+
+            Timer: 50'
+            Goals: 0 - 1
+        """.trimIndent()
+
+        val alert = com.example.domain.util.TelegramAlertParser.parseSingleAlert(message)
+        org.junit.Assert.assertNotNull(alert)
+        assertEquals("Bnei Yehud", alert!!.homeTeam)
+        assertEquals("Maccabi Amishav Petah Tikva", alert.awayTeam)
+        assertEquals("⚡Second Half Action Ready", alert.strategyName.replace("🔔", "").trim())
+
+        // Test MatchDisplayHelper
+        val resolved = com.example.domain.util.MatchDisplayHelper.resolve(
+            homeTeam = alert.homeTeam,
+            awayTeam = alert.awayTeam,
+            tip = alert.strategyName,
+            notes = "${alert.strategyName} | ${alert.matchName} | Mentve későbbre"
+        )
+        assertEquals("Bnei Yehud vs Maccabi Amishav Petah Tikva", resolved.fullMatchTitle)
+        org.junit.Assert.assertFalse(resolved.isGenericTeams)
+
+        // Test MatchDisplayHelper recovery from notes for generic teams
+        val genericResolved = com.example.domain.util.MatchDisplayHelper.resolve(
+            homeTeam = "Hazai csapat",
+            awayTeam = "Vendég csapat",
+            tip = "Both Teams to Score",
+            notes = "Both Teams to Score | Real Zaragoza vs Teruel | Mentve későbbre"
+        )
+        assertEquals("Real Zaragoza", genericResolved.homeTeam)
+        assertEquals("Teruel", genericResolved.awayTeam)
+        assertEquals("Real Zaragoza vs Teruel", genericResolved.fullMatchTitle)
+        org.junit.Assert.assertFalse(genericResolved.isGenericTeams)
+    }
 }

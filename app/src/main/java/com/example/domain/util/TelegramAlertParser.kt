@@ -116,14 +116,20 @@ object TelegramAlertParser {
         }
 
         if (strategyName.isBlank()) {
-            // Fallback strategy from first line if it looks like an alert
+            // First line fallback: if it doesn't contain a match separator, treat as strategy name
             val firstLine = lines.firstOrNull() ?: ""
-            if (firstLine.contains("Action Ready", ignoreCase = true) ||
-                firstLine.contains("Both Teams", ignoreCase = true) ||
-                firstLine.contains("Over", ignoreCase = true) ||
-                firstLine.contains("Under", ignoreCase = true)) {
+            val isFirstLineMatch = firstLine.contains(" vs ", ignoreCase = true) ||
+                    firstLine.contains(" vs. ", ignoreCase = true) ||
+                    firstLine.contains(" - ") || firstLine.contains(" – ")
+            if (!isFirstLineMatch && firstLine.isNotBlank()) {
                 strategyName = firstLine
-            } else {
+                    .replace(Regex("""^\[\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{1,2}:\d{2}\]"""), "")
+                    .replace("⚽️ ganrax Alerts:", "")
+                    .replace("⚽️ Alerts:", "")
+                    .replace(Regex("""^Stratégia:\s*""", RegexOption.IGNORE_CASE), "")
+                    .trim()
+            }
+            if (strategyName.isBlank()) {
                 strategyName = "🔔 ganrax Élő Tét Értesítés"
             }
         }
@@ -132,42 +138,22 @@ object TelegramAlertParser {
         var vsLineIndex = -1
         for (i in lines.indices) {
             val line = lines[i]
-            if (line.contains(" vs ", ignoreCase = true) &&
+            // Remove parenthetical standings such as (4th vs 19th) or (1st vs 2nd)
+            val cleanedStandings = line.replace(Regex("""\(\s*\d+(?:st|nd|rd|th)?\s+(?:vs|\-)\s+\d+(?:st|nd|rd|th)?\s*\)""", RegexOption.IGNORE_CASE), "").trim()
+
+            if (cleanedStandings.contains(" vs ", ignoreCase = true) &&
                 !line.contains("Goals:", ignoreCase = true) &&
                 !line.contains("Odds", ignoreCase = true) &&
                 !line.startsWith("(") &&
                 !line.contains("Strike Rate", ignoreCase = true)) {
 
-                // Found the teams line!
-                matchName = line
-                val parts = line.split(Regex("""\s+vs\s+""", RegexOption.IGNORE_CASE))
+                val parts = cleanedStandings.split(Regex("""\s+vs\s+""", RegexOption.IGNORE_CASE))
                 if (parts.size >= 2) {
-                    homeTeam = parts[0].trim()
-                    awayTeam = parts[1].trim()
-                }
-                vsLineIndex = i
-                break
-            }
-        }
-
-        // If no " vs " line, check for team pattern or return basic parsed object if matchName found
-        if (matchName.isBlank()) {
-            // Check for dash separated teams
-            for (i in lines.indices) {
-                val line = lines[i]
-                if (line.contains(" - ") &&
-                    !line.startsWith("Goals:") &&
-                    !line.startsWith("Timer:") &&
-                    !line.startsWith("Corners:") &&
-                    !line.startsWith("Momentum:") &&
-                    !line.startsWith("Shots") &&
-                    !line.startsWith("Attacks:") &&
-                    !line.startsWith("Possession") &&
-                    !line.contains("🟥") && !line.contains("🟩") && !line.contains("🟨")) {
-                    val parts = line.split(" - ")
-                    if (parts.size == 2 && parts[0].length > 2 && parts[1].length > 2) {
-                        homeTeam = parts[0].trim()
-                        awayTeam = parts[1].trim()
+                    val rawHome = parts[0].replace(Regex("""\([^\)]*\)"""), "").trim()
+                    val rawAway = parts[1].replace(Regex("""\([^\)]*\)"""), "").trim()
+                    if (rawHome.isNotBlank() && rawAway.isNotBlank()) {
+                        homeTeam = rawHome
+                        awayTeam = rawAway
                         matchName = "$homeTeam vs $awayTeam"
                         vsLineIndex = i
                         break
@@ -176,8 +162,69 @@ object TelegramAlertParser {
             }
         }
 
+        // If no clean " vs " line found, check other separators
         if (matchName.isBlank()) {
-            return null // No match participants identified
+            for (i in lines.indices) {
+                val line = lines[i]
+                val cleaned = line.replace(Regex("""\(\s*\d+(?:st|nd|rd|th)?\s+vs\s+\d+(?:st|nd|rd|th)?\s*\)""", RegexOption.IGNORE_CASE), "").trim()
+                val isFormLine = line.contains("🟥") || line.contains("🟩") || line.contains("🟨")
+                val isStat = line.startsWith("Goals:") || line.startsWith("Timer:") || line.startsWith("Corners:") || line.startsWith("Momentum:") || line.startsWith("Shots") || line.startsWith("Attacks:") || line.startsWith("Possession") || line.contains("Odds", ignoreCase = true) || line.contains("Strike Rate", ignoreCase = true)
+
+                if (!isStat && !isFormLine && !line.startsWith("(") && cleaned.length >= 4) {
+                    val vsMatch = when {
+                        cleaned.contains(" vs ", ignoreCase = true) -> cleaned.split(Regex("""\s+vs\s+""", RegexOption.IGNORE_CASE))
+                        cleaned.contains(" vs. ", ignoreCase = true) -> cleaned.split(Regex("""\s+vs\.\s+""", RegexOption.IGNORE_CASE))
+                        cleaned.contains(" - ") -> cleaned.split(" - ")
+                        cleaned.contains(" – ") -> cleaned.split(" – ")
+                        cleaned.contains(" — ") -> cleaned.split(" — ")
+                        cleaned.contains(" v ", ignoreCase = true) -> cleaned.split(Regex("""\s+v\s+""", RegexOption.IGNORE_CASE))
+                        else -> null
+                    }
+                    if (vsMatch != null && vsMatch.size >= 2 && vsMatch[0].length >= 2 && vsMatch[1].length >= 2) {
+                        homeTeam = vsMatch[0].trim()
+                        awayTeam = vsMatch[1].trim()
+                        matchName = "$homeTeam vs $awayTeam"
+                        vsLineIndex = i
+                        break
+                    }
+                }
+            }
+        }
+
+        // If still blank, look for consecutive lines under strategy
+        if (matchName.isBlank()) {
+            val candidateLines = lines.filter { line ->
+                line != strategyName &&
+                !line.contains("Alerts:") &&
+                !line.contains("Goals:") &&
+                !line.contains("Timer:") &&
+                !line.contains("Corners:") &&
+                !line.contains("Momentum:") &&
+                !line.contains("Odds") &&
+                !line.contains("🟥") && !line.contains("🟩") && !line.contains("🟨") &&
+                line.length >= 3
+            }
+            if (candidateLines.size >= 2) {
+                val firstIsLeague = candidateLines[0].any { it.code in 0x1F1E6..0x1F1FF } || candidateLines[0].contains("Liga", ignoreCase = true) || candidateLines[0].contains("League", ignoreCase = true)
+                if (firstIsLeague && candidateLines.size >= 3) {
+                    league = candidateLines[0]
+                    homeTeam = candidateLines[1].trim()
+                    awayTeam = candidateLines[2].trim()
+                    matchName = "$homeTeam vs $awayTeam"
+                } else {
+                    homeTeam = candidateLines[0].trim()
+                    awayTeam = candidateLines[1].trim()
+                    matchName = "$homeTeam vs $awayTeam"
+                }
+            } else if (candidateLines.size == 1) {
+                matchName = candidateLines[0].trim()
+                homeTeam = matchName
+                awayTeam = ""
+            } else {
+                matchName = "Mérkőzés"
+                homeTeam = "Hazai csapat"
+                awayTeam = "Vendég csapat"
+            }
         }
 
         // 4. Find League / Country (usually the line right above the teams line)

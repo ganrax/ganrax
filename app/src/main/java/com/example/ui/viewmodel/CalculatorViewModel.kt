@@ -12,12 +12,14 @@ import com.example.domain.model.MatchStatus
 import com.example.domain.model.PresetOddsRow
 import com.example.domain.model.ProgressionLevel
 import com.example.domain.model.RoundStakeResult
+import com.example.domain.util.MatchDisplayHelper
 import com.example.domain.util.TelegramAlertParser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -45,6 +47,16 @@ class CalculatorViewModel(private val repository: BettingRepository) : ViewModel
 
     private val _selectedMatch = MutableStateFlow<CalculatorMatchItem?>(null)
     val selectedMatch: StateFlow<CalculatorMatchItem?> = _selectedMatch.asStateFlow()
+
+    // Explicit Team and Strategy identification inputs (editable by user and prefilled by Telegram)
+    private val _homeTeamInput = MutableStateFlow("Bnei Yehud")
+    val homeTeamInput: StateFlow<String> = _homeTeamInput.asStateFlow()
+
+    private val _awayTeamInput = MutableStateFlow("Maccabi Amishav Petah Tikva")
+    val awayTeamInput: StateFlow<String> = _awayTeamInput.asStateFlow()
+
+    private val _strategyNameInput = MutableStateFlow("⚡Second Half Action Ready")
+    val strategyNameInput: StateFlow<String> = _strategyNameInput.asStateFlow()
 
     // Dynamic Progression Series (Körök és Szintek Vezérlője)
     private val _activeLevel = MutableStateFlow(1)
@@ -188,6 +200,43 @@ class CalculatorViewModel(private val repository: BettingRepository) : ViewModel
     // Telegram Alert Parsing: Extracts ONLY Strategy Name and Match / Teams
     fun setTelegramInput(text: String) {
         _telegramInput.value = text
+        if (text.isNotBlank()) {
+            parseTelegramText()
+        }
+    }
+
+    fun setHomeTeam(name: String) {
+        _homeTeamInput.value = name
+        updateCurrentMatchItem()
+    }
+
+    fun setAwayTeam(name: String) {
+        _awayTeamInput.value = name
+        updateCurrentMatchItem()
+    }
+
+    fun setStrategyName(name: String) {
+        _strategyNameInput.value = name
+        updateCurrentMatchItem()
+    }
+
+    private fun updateCurrentMatchItem() {
+        val home = _homeTeamInput.value.trim()
+        val away = _awayTeamInput.value.trim()
+        val strat = _strategyNameInput.value.trim()
+        val current = _selectedMatch.value
+        val name = if (home.isNotBlank() && away.isNotBlank()) "$home vs $away" else (current?.matchName ?: "$home vs $away")
+        _selectedMatch.value = current?.copy(
+            homeTeam = home,
+            awayTeam = away,
+            matchName = name,
+            strategyName = strat
+        ) ?: CalculatorMatchItem(
+            homeTeam = home,
+            awayTeam = away,
+            matchName = name,
+            strategyName = strat
+        )
     }
 
     fun parseTelegramText() {
@@ -212,18 +261,28 @@ class CalculatorViewModel(private val repository: BettingRepository) : ViewModel
         }
         _extractedMatches.value = items
         if (items.isNotEmpty()) {
-            _selectedMatch.value = items.first()
+            val first = items.first()
+            _selectedMatch.value = first
+            _homeTeamInput.value = first.homeTeam
+            _awayTeamInput.value = first.awayTeam
+            _strategyNameInput.value = first.strategyName
         }
     }
 
     fun selectMatch(match: CalculatorMatchItem) {
         _selectedMatch.value = match
+        _homeTeamInput.value = match.homeTeam
+        _awayTeamInput.value = match.awayTeam
+        _strategyNameInput.value = match.strategyName
     }
 
     fun clearTelegram() {
         _telegramInput.value = ""
         _extractedMatches.value = emptyList()
         _selectedMatch.value = null
+        _homeTeamInput.value = ""
+        _awayTeamInput.value = ""
+        _strategyNameInput.value = ""
     }
 
     fun loadSampleTelegram(autoParse: Boolean = true) {
@@ -276,12 +335,14 @@ Both Teams To Score:
 
     /**
      * MENTÉS KÉSŐBBRE: Elmenti az aktuális mérkőzést az adatbázisba PENDING státusszal,
-     * a kiválasztott oddsszal és kiszámított téttel, így később bármikor visszatölthető!
+     * a pontos csapatnevekkel (Hazai és Vendég csapat), stratégiával, a kiválasztott oddsszal
+     * és kiszámított téttel, így később bármikor azonosítható és visszatölthető!
      */
     fun saveCurrentMatchForLater(onSavedToast: (String) -> Unit) {
-        val currentMatch = _selectedMatch.value
-        val matchName = currentMatch?.matchName ?: "Kiválasztott Mérkőzés"
-        val strategy = currentMatch?.strategyName ?: "Telegram Alert"
+        val home = _homeTeamInput.value.trim().ifBlank { _selectedMatch.value?.homeTeam?.trim() ?: "Hazai csapat" }
+        val away = _awayTeamInput.value.trim().ifBlank { _selectedMatch.value?.awayTeam?.trim() ?: "Vendég csapat" }
+        val strategy = _strategyNameInput.value.trim().ifBlank { _selectedMatch.value?.strategyName?.trim() ?: "Telegram Alert" }
+        val matchName = if (home.isNotBlank() && away.isNotBlank()) "$home vs $away" else (_selectedMatch.value?.matchName ?: "$home vs $away")
         val odds = _currentOddsInput.value.replace(",", ".").trim().toDoubleOrNull() ?: 1.50
         val stake = currentCalculatedStake.value
 
@@ -290,35 +351,62 @@ Both Teams To Score:
                 dayNumber = currentBank.value?.activeDay ?: 1,
                 roundNumber = _activeLevel.value,
                 sport = "Labdarúgás",
-                league = currentMatch?.league ?: "",
-                homeTeam = currentMatch?.homeTeam ?: "Hazai",
-                awayTeam = currentMatch?.awayTeam ?: "Vendég",
+                league = _selectedMatch.value?.league ?: "",
+                homeTeam = home,
+                awayTeam = away,
                 market = "Szint ${_activeLevel.value}",
                 tip = strategy,
                 odds = odds,
                 stake = stake,
                 status = "PENDING",
-                notes = "$strategy | Mentve későbbi megjátszásra"
+                notes = "$strategy | $matchName | Mentve későbbre"
             )
             repository.insertMatch(entity)
-            onSavedToast("💾 '$matchName' sikeresen elmentve későbbre!")
+            onSavedToast("💾 '$matchName' ($strategy) sikeresen elmentve!")
         }
     }
 
     /**
-     * Elmentett meccs betöltése a kalkulátorba
+     * Elmentett meccs betöltése a kalkulátorba (pontos csapatnevekkel és stratégiával!)
      */
     fun loadSavedMatchIntoCalculator(match: BetMatchEntity) {
+        val resolved = MatchDisplayHelper.resolve(match)
+        _homeTeamInput.value = resolved.homeTeam
+        _awayTeamInput.value = resolved.awayTeam
+        _strategyNameInput.value = resolved.strategyName
         _selectedMatch.value = CalculatorMatchItem(
-            homeTeam = match.homeTeam,
-            awayTeam = match.awayTeam,
-            matchName = "${match.homeTeam} vs ${match.awayTeam}",
-            strategyName = match.tip,
+            homeTeam = resolved.homeTeam,
+            awayTeam = resolved.awayTeam,
+            matchName = resolved.fullMatchTitle,
+            strategyName = resolved.strategyName,
             league = match.league,
             oddsInput = match.odds.toString()
         )
         _currentOddsInput.value = String.format(java.util.Locale.US, "%.2f", match.odds)
         _activeLevel.value = match.roundNumber
+    }
+
+    /**
+     * Elmentett meccs csapatainak és stratégiájának közvetlen szerkesztése és azonosítása
+     */
+    fun updateSavedMatchDetails(matchId: Long, homeTeam: String, awayTeam: String, strategyName: String, onUpdated: (String) -> Unit) {
+        viewModelScope.launch {
+            val all = repository.allMatches.first()
+            val existing = all.find { it.id == matchId }
+            if (existing != null) {
+                val cleanHome = homeTeam.trim().ifBlank { "Hazai csapat" }
+                val cleanAway = awayTeam.trim().ifBlank { "Vendég csapat" }
+                val cleanStrat = strategyName.trim().ifBlank { existing.tip }
+                val updated = existing.copy(
+                    homeTeam = cleanHome,
+                    awayTeam = cleanAway,
+                    tip = cleanStrat,
+                    notes = "$cleanStrat | $cleanHome vs $cleanAway | Mentve későbbre"
+                )
+                repository.updateMatch(updated)
+                onUpdated("✅ '$cleanHome vs $cleanAway' adatai sikeresen frissítve!")
+            }
+        }
     }
 
     /**
@@ -366,8 +454,10 @@ Both Teams To Score:
         val netProfit = currentNetProfit.value
         val currentMatch = _selectedMatch.value
 
-        val matchName = currentMatch?.matchName ?: "Kör $currentLevelNum Fogadás"
-        val strategyName = currentMatch?.strategyName ?: "Stratégia"
+        val home = _homeTeamInput.value.trim().ifBlank { _selectedMatch.value?.homeTeam?.trim() ?: "Hazai csapat" }
+        val away = _awayTeamInput.value.trim().ifBlank { _selectedMatch.value?.awayTeam?.trim() ?: "Vendég csapat" }
+        val strategyName = _strategyNameInput.value.trim().ifBlank { _selectedMatch.value?.strategyName?.trim() ?: "Stratégia" }
+        val matchName = if (home.isNotBlank() && away.isNotBlank()) "$home vs $away" else "Kör $currentLevelNum Fogadás"
 
         viewModelScope.launch {
             if (won) {
@@ -397,18 +487,18 @@ Both Teams To Score:
                     roundNumber = currentLevelNum,
                     sport = "Labdarúgás",
                     league = currentMatch?.league ?: "",
-                    homeTeam = currentMatch?.homeTeam ?: "Hazai",
-                    awayTeam = currentMatch?.awayTeam ?: "Vendég",
+                    homeTeam = home,
+                    awayTeam = away,
                     market = "Szint $currentLevelNum",
                     tip = strategyName,
                     odds = odds,
                     stake = stake,
                     status = "WON",
-                    notes = "Széria lezárva a(z) $currentLevelNum. szinten! Net profit: +${netProfit.toInt()} Ft"
+                    notes = "$strategyName | $matchName | Széria lezárva a(z) $currentLevelNum. szinten! (+${netProfit.toInt()} Ft)"
                 )
                 repository.insertMatch(entity)
 
-                onCompletedToast("🎉 $currentLevelNum. Szint NYERT! +${netProfit.toInt()} Ft tiszta profit hozzáadva a tőkéhez!")
+                onCompletedToast("🎉 $matchName ($strategyName) NYERT! +${netProfit.toInt()} Ft tiszta profit jóváírva!")
             } else {
                 // Record level as LOST
                 val levelRecord = ProgressionLevel(
@@ -433,24 +523,24 @@ Both Teams To Score:
                     roundNumber = currentLevelNum,
                     sport = "Labdarúgás",
                     league = currentMatch?.league ?: "",
-                    homeTeam = currentMatch?.homeTeam ?: "Hazai",
-                    awayTeam = currentMatch?.awayTeam ?: "Vendég",
+                    homeTeam = home,
+                    awayTeam = away,
                     market = "Szint $currentLevelNum",
                     tip = strategyName,
                     odds = odds,
                     stake = stake,
                     status = "LOST",
-                    notes = "$currentLevelNum. szint veszített (-${stake.toInt()} Ft). Következő szint: ${_activeLevel.value}."
+                    notes = "$strategyName | $matchName | $currentLevelNum. szint vesztett (-${stake.toInt()} Ft)"
                 )
                 repository.insertMatch(entity)
 
                 // Advance to next match from Telegram if available
                 val nextIndex = _extractedMatches.value.indexOfFirst { it.id == currentMatch?.id } + 1
                 if (nextIndex in _extractedMatches.value.indices) {
-                    _selectedMatch.value = _extractedMatches.value[nextIndex]
+                    selectMatch(_extractedMatches.value[nextIndex])
                 }
 
-                onCompletedToast("🔴 $currentLevelNum. Szint veszített (-${stake.toInt()} Ft). Szükséges tét újraszámolva a(z) ${_activeLevel.value}. szintre!")
+                onCompletedToast("🔴 $matchName ($currentLevelNum. szint) veszített (-${stake.toInt()} Ft). Új tét számolva a(z) ${_activeLevel.value}. szintre!")
             }
         }
     }

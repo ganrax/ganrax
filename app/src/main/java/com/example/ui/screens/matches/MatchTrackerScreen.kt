@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.BetMatchEntity
 import com.example.domain.calculator.BettingMathEngine
 import com.example.domain.model.MatchStatus
+import com.example.domain.util.MatchDisplayHelper
 import com.example.network.gemini.MatchAiAnalysis
 import com.example.ui.components.*
 import com.example.ui.theme.*
@@ -50,6 +51,7 @@ fun MatchTrackerScreen(
 
     var showAddMatchDialog by remember { mutableStateOf(false) }
     var matchToEditScore by remember { mutableStateOf<BetMatchEntity?>(null) }
+    var matchToEditDetails by remember { mutableStateOf<BetMatchEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -222,6 +224,7 @@ fun MatchTrackerScreen(
                     match = match,
                     onSettle = { status -> viewModel.settleMatch(match.id, status) },
                     onEditScore = { matchToEditScore = match },
+                    onEditDetails = { matchToEditDetails = match },
                     onDelete = { viewModel.deleteMatch(match.id) },
                     onAnalyzeAi = {
                         val bank = stats?.currentBank ?: 10000.0
@@ -241,6 +244,19 @@ fun MatchTrackerScreen(
                 viewModel.addMatch(match)
                 showAddMatchDialog = false
                 Toast.makeText(context, "Mérkőzés sikeresen hozzáadva!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Edit Match Details Dialog (Csapatok és Stratégia szerkesztése)
+    if (matchToEditDetails != null) {
+        EditMatchDetailsDialog(
+            match = matchToEditDetails!!,
+            onDismiss = { matchToEditDetails = null },
+            onSave = { updatedMatch ->
+                viewModel.updateMatch(updatedMatch)
+                matchToEditDetails = null
+                Toast.makeText(context, "${updatedMatch.homeTeam} vs ${updatedMatch.awayTeam} adatai mentve!", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -273,10 +289,12 @@ fun MatchItemCard(
     match: BetMatchEntity,
     onSettle: (MatchStatus) -> Unit,
     onEditScore: () -> Unit,
+    onEditDetails: () -> Unit,
     onDelete: () -> Unit,
     onAnalyzeAi: () -> Unit
 ) {
     val statusEnum = MatchStatus.fromString(match.status)
+    val resolved = MatchDisplayHelper.resolve(match)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -323,25 +341,71 @@ fun MatchItemCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Teams & Score
+            // Teams & Score - PROMINENT DISPLAY WITH TEAM NAMES
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = match.homeTeam,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = match.awayTeam,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsSoccer,
+                            contentDescription = null,
+                            tint = EmeraldPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = resolved.fullMatchTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (resolved.isGenericTeams) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = StatusLost.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, StatusLost.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable(onClick = onEditDetails)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = StatusLost, modifier = Modifier.size(12.dp))
+                                Text(
+                                    text = "⚠️ Csapatok megadása / Azonosítás",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StatusLost
+                                )
+                            }
+                        }
+                    }
+
+                    if (resolved.strategyName.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = GoldOdds.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = "Stratégia: ${resolved.strategyName}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldOdds,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 if (match.homeScore != null && match.awayScore != null) {
@@ -447,12 +511,24 @@ fun MatchItemCard(
                     }
 
                     IconButton(
-                        onClick = onEditScore,
+                        onClick = onEditDetails,
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Eredmény szerkesztése",
+                            contentDescription = "Meccs és csapatok szerkesztése",
+                            tint = EmeraldPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onEditScore,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsScore,
+                            contentDescription = "Eredmény beállítása",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
@@ -779,6 +855,121 @@ fun AddMatchDialog(
                 enabled = homeTeam.isNotBlank() && awayTeam.isNotBlank()
             ) {
                 Text("Fogadás Mentése (${BettingMathEngine.formatCurrency(computedStake)})")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Mégse")
+            }
+        }
+    )
+}
+
+@Composable
+fun EditMatchDetailsDialog(
+    match: BetMatchEntity,
+    onDismiss: () -> Unit,
+    onSave: (BetMatchEntity) -> Unit
+) {
+    val resolved = MatchDisplayHelper.resolve(match)
+    var homeTeam by remember { mutableStateOf(if (match.homeTeam.isNotBlank() && !match.homeTeam.startsWith("Hazai")) match.homeTeam else resolved.homeTeam) }
+    var awayTeam by remember { mutableStateOf(if (match.awayTeam.isNotBlank() && !match.awayTeam.startsWith("Vendég")) match.awayTeam else resolved.awayTeam) }
+    var tip by remember { mutableStateOf(if (match.tip.isNotBlank()) match.tip else resolved.strategyName) }
+    var league by remember { mutableStateOf(match.league) }
+    var oddsStr by remember { mutableStateOf(match.odds.toString()) }
+    var stakeStr by remember { mutableStateOf(match.stake.toInt().toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = EmeraldPrimary)
+                Text("Mérkőzés Adatainak Módosítása", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = homeTeam,
+                    onValueChange = { homeTeam = it },
+                    label = { Text("Hazai Csapat") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = awayTeam,
+                    onValueChange = { awayTeam = it },
+                    label = { Text("Vendég Csapat") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = tip,
+                    onValueChange = { tip = it },
+                    label = { Text("Stratégia / Tipp") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = league,
+                    onValueChange = { league = it },
+                    label = { Text("Bajnokság / Liga") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = oddsStr,
+                        onValueChange = { oddsStr = it },
+                        label = { Text("Odds") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = stakeStr,
+                        onValueChange = { stakeStr = it },
+                        label = { Text("Tét (Ft)") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val odds = oddsStr.replace(",", ".").toDoubleOrNull() ?: match.odds
+                    val stake = stakeStr.toDoubleOrNull() ?: match.stake
+                    onSave(
+                        match.copy(
+                            homeTeam = homeTeam.trim(),
+                            awayTeam = awayTeam.trim(),
+                            tip = tip.trim(),
+                            league = league.trim(),
+                            odds = odds,
+                            stake = stake
+                        )
+                    )
+                },
+                enabled = homeTeam.isNotBlank() && awayTeam.isNotBlank()
+            ) {
+                Text("Mentés")
             }
         },
         dismissButton = {

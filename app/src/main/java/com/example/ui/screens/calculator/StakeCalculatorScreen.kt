@@ -37,6 +37,7 @@ import com.example.data.local.entity.BetMatchEntity
 import com.example.domain.calculator.BettingMathEngine
 import com.example.domain.model.CalculatorMatchItem
 import com.example.domain.model.CalculatorMode
+import com.example.domain.util.MatchDisplayHelper
 import com.example.ui.components.AppHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.CalculatorViewModel
@@ -59,6 +60,10 @@ fun StakeCalculatorScreen(
     val extractedMatches by viewModel.extractedMatches.collectAsStateWithLifecycle()
     val selectedMatch by viewModel.selectedMatch.collectAsStateWithLifecycle()
 
+    val homeTeamInput by viewModel.homeTeamInput.collectAsStateWithLifecycle()
+    val awayTeamInput by viewModel.awayTeamInput.collectAsStateWithLifecycle()
+    val strategyNameInput by viewModel.strategyNameInput.collectAsStateWithLifecycle()
+
     // Active progression levels state
     val activeLevel by viewModel.activeLevel.collectAsStateWithLifecycle()
     val currentOdds by viewModel.currentOddsInput.collectAsStateWithLifecycle()
@@ -79,6 +84,7 @@ fun StakeCalculatorScreen(
     val roundOdds by viewModel.roundOdds.collectAsStateWithLifecycle()
 
     var showLadderDetails by remember { mutableStateOf(false) }
+    var matchToIdentify by remember { mutableStateOf<BetMatchEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -387,6 +393,123 @@ fun StakeCalculatorScreen(
                 }
             }
 
+            // MÉRKŐZÉS ÉS CSAPATOK AZONOSÍTÁSA (EXPLICIT IDENTIFICATION)
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().testTag("match_teams_card")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.SportsSoccer, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(20.dp))
+                            Column {
+                                Text(
+                                    text = "Mérkőzés és Csapatok Azonosítása",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "A mentett mérkőzésnél megjelenő csapatnevek és stratégia",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Home Team and Away Team Inputs
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = homeTeamInput,
+                                onValueChange = { viewModel.setHomeTeam(it) },
+                                label = { Text("Hazai Csapat") },
+                                placeholder = { Text("pl. Real Madrid") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).testTag("input_home_team")
+                            )
+
+                            OutlinedTextField(
+                                value = awayTeamInput,
+                                onValueChange = { viewModel.setAwayTeam(it) },
+                                label = { Text("Vendég Csapat") },
+                                placeholder = { Text("pl. Barcelona") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).testTag("input_away_team")
+                            )
+                        }
+
+                        // Strategy Name Input
+                        OutlinedTextField(
+                            value = strategyNameInput,
+                            onValueChange = { viewModel.setStrategyName(it) },
+                            label = { Text("Stratégia Neve") },
+                            placeholder = { Text("pl. Both Teams to Score / ⚡Second Half Action") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("input_strategy_name")
+                        )
+
+                        // Visual Identity Banner
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Icon(imageVector = Icons.Default.SportsSoccer, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = "${homeTeamInput.ifBlank { "Hazai csapat" }} vs ${awayTeamInput.ifBlank { "Vendég csapat" }}",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GoldOdds.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = strategyNameInput.ifBlank { "Stratégia" },
+                                        color = GoldOdds,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // CORE PROGRESSION CONTROLLER (SZINTEK ÉS KÖRÖK SZÁMÍTÓJA)
             item {
                 Card(
@@ -450,64 +573,64 @@ fun StakeCalculatorScreen(
                         }
 
                         // Match Details Header (Strategy + Teams)
-                        selectedMatch?.let { match ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = GoldOdds.copy(alpha = 0.18f)
                                     ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = GoldOdds.copy(alpha = 0.18f)
-                                        ) {
-                                            Text(
-                                                text = match.strategyName,
-                                                color = GoldOdds,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-
-                                        if (match.googleSearchUrl.isNotBlank()) {
-                                            TextButton(
-                                                onClick = {
-                                                    try {
-                                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(match.googleSearchUrl))
-                                                        context.startActivity(intent)
-                                                    } catch (e: Exception) {
-                                                        uriHandler.openUri(match.googleSearchUrl)
-                                                    }
-                                                },
-                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Google Keresés", fontSize = 11.sp)
-                                            }
-                                        }
-                                    }
-
-                                    Text(
-                                        text = match.matchName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-
-                                    if (match.league.isNotBlank()) {
                                         Text(
-                                            text = match.league,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = strategyNameInput.ifBlank { selectedMatch?.strategyName ?: "Stratégia" },
+                                            color = GoldOdds,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
+
+                                    selectedMatch?.googleSearchUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                                        TextButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    uriHandler.openUri(url)
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Google Keresés", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = if (homeTeamInput.isNotBlank() && awayTeamInput.isNotBlank())
+                                        "$homeTeamInput vs $awayTeamInput"
+                                    else (selectedMatch?.matchName ?: "Kiválasztott Mérkőzés"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                selectedMatch?.league?.takeIf { it.isNotBlank() }?.let { league ->
+                                    Text(
+                                        text = league,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
@@ -830,55 +953,149 @@ fun StakeCalculatorScreen(
                             }
 
                             savedPendingMatches.forEach { savedMatch ->
+                                val resolved = MatchDisplayHelper.resolve(savedMatch)
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.fillMaxWidth()
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth().testTag("saved_match_${savedMatch.id}")
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
+                                        // 1. Teams Name Line - PROMINENT, BOLD & SOCCER ICON
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "${savedMatch.homeTeam} vs ${savedMatch.awayTeam}",
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.SportsSoccer,
+                                                    contentDescription = null,
+                                                    tint = EmeraldPrimary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Text(
+                                                    text = resolved.fullMatchTitle,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
 
                                             Surface(
                                                 shape = RoundedCornerShape(6.dp),
-                                                color = GoldOdds.copy(alpha = 0.2f)
+                                                color = GoldOdds.copy(alpha = 0.2f),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, GoldOdds.copy(alpha = 0.4f))
                                             ) {
                                                 Text(
                                                     text = "${savedMatch.roundNumber}. Szint",
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = GoldOdds,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                                 )
                                             }
                                         }
 
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "${savedMatch.tip} | Odds: ${String.format(java.util.Locale.US, "%.2f", savedMatch.odds)} | Tét: ${BettingMathEngine.formatCurrency(savedMatch.stake)}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = EmeraldPrimary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                        // Warning / Quick Identify banner if team names are generic
+                                        if (resolved.isGenericTeams) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = StatusLost.copy(alpha = 0.15f),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, StatusLost.copy(alpha = 0.5f)),
+                                                modifier = Modifier.fillMaxWidth().clickable { matchToIdentify = savedMatch }
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = StatusLost, modifier = Modifier.size(14.dp))
+                                                    Text(
+                                                        text = "⚠️ Nincs azonosítva a két csapat! Kattints ide a nevek megadásához",
+                                                        color = StatusLost,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
                                         }
 
-                                        // Action buttons on saved match: Load, Win, Lose, Delete
+                                        // 2. Strategy Badge & League
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = EmeraldPrimary.copy(alpha = 0.15f)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(imageVector = Icons.Default.Lightbulb, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(12.dp))
+                                                    Text(
+                                                        text = "Stratégia: ${resolved.strategyName}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = EmeraldPrimary,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+
+                                            if (savedMatch.league.isNotBlank()) {
+                                                Text(
+                                                    text = "• ${savedMatch.league}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        // 3. Odds & Stake Info
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Odds: @${String.format(java.util.Locale.US, "%.2f", savedMatch.odds)}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = GoldOdds,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "Tét: ${BettingMathEngine.formatCurrency(savedMatch.stake)}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = EmeraldPrimary,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "Várható: ${BettingMathEngine.formatCurrency(savedMatch.stake * savedMatch.odds)}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        // Action buttons on saved match: Load, Win, Lose, Edit, Delete
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -887,7 +1104,7 @@ fun StakeCalculatorScreen(
                                             OutlinedButton(
                                                 onClick = {
                                                     viewModel.loadSavedMatchIntoCalculator(savedMatch)
-                                                    Toast.makeText(context, "${savedMatch.homeTeam} vs ${savedMatch.awayTeam} betöltve a kalkulátorba!", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "${resolved.fullMatchTitle} betöltve a kalkulátorba!", Toast.LENGTH_SHORT).show()
                                                 },
                                                 shape = RoundedCornerShape(8.dp),
                                                 modifier = Modifier.weight(1.3f),
@@ -924,6 +1141,13 @@ fun StakeCalculatorScreen(
                                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
                                             ) {
                                                 Text("Vesztett", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            IconButton(
+                                                onClick = { matchToIdentify = savedMatch },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Edit, contentDescription = "Azonosítás", tint = EmeraldPrimary, modifier = Modifier.size(16.dp))
                                             }
 
                                             IconButton(
@@ -1027,4 +1251,100 @@ fun StakeCalculatorScreen(
             }
         }
     }
+
+    if (matchToIdentify != null) {
+        IdentifySavedMatchDialog(
+            match = matchToIdentify!!,
+            onDismiss = { matchToIdentify = null },
+            onSave = { home, away, strategy ->
+                viewModel.updateSavedMatchDetails(matchToIdentify!!.id, home, away, strategy) { msg ->
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+                matchToIdentify = null
+            }
+        )
+    }
+}
+
+@Composable
+fun IdentifySavedMatchDialog(
+    match: BetMatchEntity,
+    onDismiss: () -> Unit,
+    onSave: (home: String, away: String, strategy: String) -> Unit
+) {
+    val resolved = MatchDisplayHelper.resolve(match)
+    var homeTeam by remember { mutableStateOf(if (match.homeTeam.isNotBlank() && !match.homeTeam.startsWith("Hazai")) match.homeTeam else resolved.homeTeam) }
+    var awayTeam by remember { mutableStateOf(if (match.awayTeam.isNotBlank() && !match.awayTeam.startsWith("Vendég")) match.awayTeam else resolved.awayTeam) }
+    var strategy by remember { mutableStateOf(if (match.tip.isNotBlank()) match.tip else resolved.strategyName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(imageVector = Icons.Default.SportsSoccer, contentDescription = null, tint = EmeraldPrimary)
+                Text("Csapatok és Stratégia Azonosítása", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Add meg a mérkőzés pontos csapatneveit, hogy a mentett meccsek között egyértelműen beazonosítható legyen:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = homeTeam,
+                    onValueChange = { homeTeam = it },
+                    label = { Text("Hazai Csapat") },
+                    placeholder = { Text("pl. Arsenal / Real Madrid") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("identify_home_input")
+                )
+
+                OutlinedTextField(
+                    value = awayTeam,
+                    onValueChange = { awayTeam = it },
+                    label = { Text("Vendég Csapat") },
+                    placeholder = { Text("pl. Chelsea / Barcelona") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("identify_away_input")
+                )
+
+                OutlinedTextField(
+                    value = strategy,
+                    onValueChange = { strategy = it },
+                    label = { Text("Stratégia Neve") },
+                    placeholder = { Text("pl. Both Teams to Score / ⚡Second Half Action") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("identify_strategy_input")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(homeTeam.trim(), awayTeam.trim(), strategy.trim())
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Mentés", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Mégse")
+            }
+        }
+    )
 }

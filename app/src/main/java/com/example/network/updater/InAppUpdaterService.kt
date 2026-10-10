@@ -125,7 +125,7 @@ class InAppUpdaterService(private val context: Context) {
                     currentVersionCode = currentCode,
                     currentVersionName = currentName,
                     latestVersionCode = currentCode + 1,
-                    latestVersionName = "v1.8.0 Pro",
+                    latestVersionName = "v1.9.0 Pro",
                     releaseNotes = "A repository privát (biztonságos). A legfrissebb APK közvetlenül a GitHub alkalmazásodból vagy az alábbi gombokkal tölthető le.",
                     downloadUrl = directFallbackApkUrl,
                     isUpdateAvailable = true
@@ -139,17 +139,17 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.8.0 Pro",
+                latestVersionName = "v1.9.0 Pro",
                 releaseNotes = """
-                    • Beépített intelligens offline AI bot: internet és API kulcs nélkül is precíz tétszámítás és stratégiai válaszok
-                    • 400-as API hiba végleges javítása, zökkenőmentes automatikus fallback
-                    • Opcionális saját Gemini API kulcs beállítási lehetőség az AI fülön
-                    • Valós idejű egyedi odds alapú tétszámítás és meccsmentés
+                    • Mentett meccseknél a valós csapatnevek kiemelt megjelenítése a kártyákon
+                    • Gyors csapat- és stratégia-azonosítás / szerkesztés (⚠️ gomb és felugró ablak)
+                    • Javított Telegram értesítés feldolgozó
+                    • Beépített intelligens offline AI bot és precíz tétkalkuláció
                 """.trimIndent(),
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true,
                 fileSizeMb = 24.0,
-                releaseDate = "2026-10-06"
+                releaseDate = "2026-10-10"
             )
 
             _updateState.value = UpdateDownloadState.Available(defaultInfo)
@@ -159,7 +159,7 @@ class InAppUpdaterService(private val context: Context) {
                 currentVersionCode = currentCode,
                 currentVersionName = currentName,
                 latestVersionCode = currentCode + 1,
-                latestVersionName = "v1.8.0 Pro",
+                latestVersionName = "v1.9.0 Pro",
                 releaseNotes = "GitHub Releases frissítés (ganrax/ganrax - Privát).",
                 downloadUrl = directFallbackApkUrl,
                 isUpdateAvailable = true

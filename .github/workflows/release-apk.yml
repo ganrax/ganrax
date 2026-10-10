@@ -18,10 +18,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
@@ -67,20 +67,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             release-output/tetmester-pro-latest.apk
             release-output/tetmester-pro-v${{ steps.version.outputs.VERSION_NAME }}.apk
           tag_name: ${{ steps.version.outputs.VERSION_TAG }}
           name: TétMester Pro v${{ steps.version.outputs.VERSION_NAME }}
           make_latest: true
+          fail_on_unmatched_files: false
           body: |
             ### 🚀 TétMester Pro v${{ steps.version.outputs.VERSION_NAME }} Frissítés
+            - **Mentett meccseknél a valós csapatnevek kiemelt megjelenítése (pl. Hazai vs Vendég helyett pontos nevek)**
+            - **Gyors csapat- és stratégia-azonosítás / szerkesztés felugró ablakkal**
+            - **Intelligens Telegram értesítés feldolgozó (fejléc és meccs szétválasztás)**
             - **Automatikus verzió léptetés és külön Release bejegyzés (v${{ steps.version.outputs.VERSION_NAME }})**
             - **Egyetlen közös oldalon a Kalkulátor és a Telegram meccsek kézi odds alapú tétkezelése**
-            - **Telegram Értesítés Feldolgozó (ganrax Alerts üzenetekből meccsek, csapatok és stratégiák kinyerése)**
-            - **Automatikus kattintható Google & Flashscore kereső linkek minden meccshez**
             - **Állandó beépített kulcs (Permanent Keystore)** - garantáltan egyező aláírás minden verziónál!
-            - **Android 14 (API 34) natív optimalizáció**
             - **100 Napos Kamatos Kamat Tétkezelő (Tőke / 49.25)**
             - **Élő Mérkőzéskövető és AI meccselemző**
           draft: false

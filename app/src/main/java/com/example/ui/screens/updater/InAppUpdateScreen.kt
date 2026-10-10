@@ -583,7 +583,7 @@ fun InAppUpdateScreen(
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // v1.8.0
+                        // v1.9.0
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = EmeraldPrimary.copy(alpha = 0.08f),
@@ -596,7 +596,7 @@ fun InAppUpdateScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("v1.8.0 Pro (Telepített verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
+                                    Text("v1.9.0 Pro (Legfrissebb verzió)", fontWeight = FontWeight.Bold, color = EmeraldPrimary, style = MaterialTheme.typography.titleSmall)
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = EmeraldPrimary,
@@ -605,6 +605,21 @@ fun InAppUpdateScreen(
                                         Text("AKTÍV ✓", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
+                                Text("• Mentett meccseknél a valós csapatnevek kiemelt megjelenítése (focilabda ikonnal)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Gyors csapat- és stratégia-azonosítás / szerkesztés (⚠️ figyelmeztető sáv és felugró ablak)", style = MaterialTheme.typography.bodySmall)
+                                Text("• Telegram értesítés feldolgozó továbbfejlesztése: fejléc és meccs szétválasztása", style = MaterialTheme.typography.bodySmall)
+                                Text("• GitHub Actions JDK 21 kompatibilitás és megbízható APK generálás", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // v1.8.0
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("v1.8.0 Pro", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
                                 Text("• Verziószám és verziójelvény megjelenítése minden képernyő fejlécében és a frissítőben", style = MaterialTheme.typography.bodySmall)
                                 Text("• Beépített intelligens offline fogadási szakértő motor (internet és API kulcs nélkül)", style = MaterialTheme.typography.bodySmall)
                                 Text("• Egyedi odds alapú tétszámítás és mérkőzésmentés a helyi adatbázisba", style = MaterialTheme.typography.bodySmall)
